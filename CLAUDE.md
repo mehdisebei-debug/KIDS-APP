@@ -169,3 +169,77 @@ GOOGLE_PLACES_API_KEY=           # Scripts import seulement
 - Préférence pour des explications sur les parties spécifiques à Next.js qui diffèrent de React
 - MVP d'abord : fonctionnel > parfait
 - Quand tu proposes du code, toujours inclure les imports
+
+---
+
+## Workflow multi-agents (contrat de handoff)
+
+Quatre sous-agents (`.claude/agents/`) se passent le relais via GitHub Issues + le Project
+**KIDS-APP Pipeline**. Ces règles sont la loi — ne jamais dévier.
+
+### Signaux entre agents
+
+- Une US = une Issue avec le label `type: user-story`.
+- Un handoff = changement de label `status: *` **ET** déplacement de la carte dans le Project.
+- Toute PR référence son issue avec `Closes #<num>` dans le corps.
+- Le reviewer poste son verdict en texte (`VERDICT: APPROVED` / `VERDICT: CHANGES_REQUESTED`)
+  via `gh pr review --comment` — jamais `--approve` (même compte que l'auteur → refusé par GitHub).
+- Aucun merge sans : verdict APPROVED + `QA: GO` + CI verte + **validation humaine explicite**.
+- Boucle dev↔review plafonnée à 2 allers-retours, ensuite escalade à l'humain.
+- Merge en **squash uniquement** (imposé par le ruleset `protect-main`).
+
+### Étapes et responsables
+
+| Colonne | Label | Qui agit |
+|---|---|---|
+| `Backlog` | — | product-owner (affine l'US) |
+| `Ready` | `status: ready` | US complète, attend le developer |
+| `In Progress` | `status: in-progress` | developer (branche + code) |
+| `In Review` | `status: review` | reviewer |
+| `QA` | `status: qa` | qa |
+| `Deployed` | — | mergé sur `main`, Vercel déploie |
+
+### Commandes gh de référence (IDs réels du projet)
+
+Project : numéro **1**, owner **mehdisebei-debug**, id `PVT_kwHOEgSBb84BfnM_`.
+Champ Status : `PVTSSF_lAHOEgSBb84BfnM_zhZ43jw`.
+
+```bash
+# Créer une issue US
+gh issue create --title "[US] ..." --body "..." --label "type: user-story" --label "priority: p1"
+
+# Ajouter l'issue au board (retourne l'item-id de la carte)
+gh project item-add 1 --owner mehdisebei-debug --url <url-issue>
+
+# Retrouver l'item-id d'une carte existante
+gh project item-list 1 --owner mehdisebei-debug --format json
+
+# Déplacer une carte (option-id selon la colonne cible, voir table ci-dessous)
+gh project item-edit --id <item-id> --project-id PVT_kwHOEgSBb84BfnM_ \
+  --field-id PVTSSF_lAHOEgSBb84BfnM_zhZ43jw --single-select-option-id <option-id>
+
+# Changer le label status d'une issue (retirer l'ancien, poser le nouveau)
+gh issue edit <num> --remove-label "status: ready" --add-label "status: in-progress"
+```
+
+| Colonne | option-id |
+|---|---|
+| Backlog | `58e7e7d9` |
+| Ready | `0031a187` |
+| In Progress | `e31e8ab5` |
+| In Review | `ea1503a2` |
+| QA | `e01d3446` |
+| Deployed | `4cf0d3db` |
+
+### Branches et commits
+
+- Branches : `feat/<num>-slug`, `fix/<num>-slug` — toujours depuis `main` à jour.
+- Commits : Conventional Commits en français (`feat:`, `fix:`, `test:`, `chore:`).
+- Avant toute PR : `npm run lint && npm run type-check && npm run build` verts.
+
+### Garde-fous
+
+- Un agent ne fait QUE son rôle : le developer ne review pas, le reviewer ne code pas,
+  le qa ne modifie pas la feature.
+- Secrets (Supabase, Mapbox) : jamais dans le code, les issues ou les PR.
+- Tant que le workflow n'est pas éprouvé : merge uniquement sur ordre humain explicite.
