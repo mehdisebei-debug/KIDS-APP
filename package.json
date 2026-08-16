@@ -12,9 +12,11 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2",
+    "mapbox-gl": "^3.28.1",
     "next": "14.2.35",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "react-map-gl": "^8.1.2"
   },
   "devDependencies": {
     "@types/node": "^20",
