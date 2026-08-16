@@ -1,43 +1,47 @@
-import { MOCK_ACTIVITIES } from '@/lib/data/mock-activities'
-import { CATEGORY_LABELS } from '@/lib/types/activity'
-import Link from 'next/link'
+'use client'
 
-// Placeholder du mode carte — Mapbox sera branché plus tard
-// (import dynamique avec ssr: false obligatoire à ce moment-là)
+import dynamic from 'next/dynamic'
+import type { FilterState } from '@/lib/types/activity'
+import useActivities from '@/hooks/useActivities'
+
+// Mapbox GL ne fonctionne que dans le navigateur → jamais rendu côté serveur
+const ActivityMap = dynamic(() => import('@/components/activity/ActivityMap'), {
+  ssr: false,
+  loading: () => (
+    <div
+      role="status"
+      aria-label="Chargement de la carte"
+      className="h-[70vh] w-full animate-pulse rounded-3xl bg-gray-100 md:h-[72vh]"
+    />
+  ),
+})
+
+// Filtres par défaut — la synchronisation avec la FilterBar fera l'objet d'une autre US.
+// Référence stable (hors composant) pour ne pas relancer le fetch à chaque rendu.
+const DEFAULT_FILTERS: FilterState = {
+  category: null,
+  age_min: 0,
+  age_max: 6,
+  distance_km: 20,
+  price_max: null,
+  search_query: '',
+}
+
 export default function CartePage() {
+  const { activities, loading, error } = useActivities(DEFAULT_FILTERS)
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h1 className="mb-1 text-xl font-bold md:text-2xl">Carte des activités</h1>
         <p className="text-sm text-gray-600">
-          La carte interactive Mapbox arrive bientôt. En attendant, voici les lieux référencés.
+          {loading
+            ? 'Chargement des activités...'
+            : `${activities.length} activité${activities.length > 1 ? 's' : ''} en Île-de-France`}
         </p>
       </div>
 
-      <div className="flex h-64 items-center justify-center rounded-3xl border-2 border-dashed border-gray-200 bg-white md:h-80">
-        <div className="text-center">
-          <p className="mb-2 text-4xl">🗺️</p>
-          <p className="font-medium text-gray-700">Carte Mapbox à venir</p>
-          <p className="text-sm text-gray-500">Nécessite NEXT_PUBLIC_MAPBOX_TOKEN</p>
-        </div>
-      </div>
-
-      <ul className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-100 bg-white">
-        {MOCK_ACTIVITIES.map((activity) => (
-          <li key={activity.id}>
-            <Link
-              href={`/activite/${activity.id}`}
-              className="flex items-center gap-3 px-4 py-3 transition hover:bg-gray-50"
-            >
-              <span className="text-xl">{CATEGORY_LABELS[activity.category].emoji}</span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{activity.name}</p>
-                <p className="truncate text-xs text-gray-500">{activity.address}</p>
-              </div>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <ActivityMap activities={activities} loading={loading} error={error} />
     </div>
   )
 }
