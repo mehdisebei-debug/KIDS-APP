@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import Link from 'next/link'
 import type { EventRow } from '@/lib/types/event'
 import { ageRangeLabel, priceLabel } from '@/lib/utils/format'
 
@@ -20,7 +21,10 @@ function dateRangeLabel(event: EventRow): string {
 
 export default function EventCard({ event }: EventCardProps) {
   return (
-    <article className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-md">
+    <Link
+      href={`/evenement/${event.id}`}
+      className="block overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-md"
+    >
       {/* Image de l'événement, ou visuel placeholder */}
       {event.image_url ? (
         <div className="relative h-32 md:h-40">
@@ -54,6 +58,6 @@ export default function EventCard({ event }: EventCardProps) {
           {priceLabel(event.price_min, event.price_max)}
         </p>
       </div>
-    </article>
+    </Link>
   )
 }
