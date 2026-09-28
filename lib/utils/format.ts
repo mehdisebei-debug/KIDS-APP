@@ -26,8 +26,29 @@ export function yearsToMonths(years: number): number {
   return years * 12
 }
 
+// Normalise une chaîne pour la comparaison : sans accents, sans casse, sans ponctuation/espaces
+// (ex : "Saint-Ouen" et "SAINT OUEN" deviennent tous deux "saintouen")
+function normalizeForComparison(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+}
+
+// Vrai si `needle` est déjà présent dans `haystack` (comparaison normalisée)
+function isAlreadyIncluded(haystack: string, needle: string | null): boolean {
+  if (!needle) return false
+  const normalizedNeedle = normalizeForComparison(needle)
+  if (!normalizedNeedle) return false
+  return normalizeForComparison(haystack).includes(normalizedNeedle)
+}
+
 // Lieu complet d'un événement : nom du lieu (si renseigné), adresse, puis code postal + ville
 // Ex : "Parc de la Villette, 211 Avenue Jean Jaurès, 75019 Paris"
+// L'API OpenAgenda renvoie souvent une `address` qui contient déjà le code postal et/ou la
+// ville (ex. "20 Rue de Poissy, 75005 Paris, France") : on ne les ré-ajoute donc que s'ils ne
+// sont pas déjà présents dans `address`, pour éviter un doublon type "75005 Paris, ..., 75005 Paris".
 export function eventVenueLabel(venue: {
   venue_name: string | null
   address: string | null
@@ -37,8 +58,13 @@ export function eventVenueLabel(venue: {
   const parts: string[] = []
   if (venue.venue_name) parts.push(venue.venue_name)
   if (venue.address) parts.push(venue.address)
-  const postalCity = [venue.postal_code, venue.city].filter(Boolean).join(' ')
+
+  const postalCityParts = [venue.postal_code, venue.city].filter(
+    (value): value is string => Boolean(value) && !isAlreadyIncluded(venue.address ?? '', value)
+  )
+  const postalCity = postalCityParts.join(' ')
   if (postalCity) parts.push(postalCity)
+
   return parts.join(', ')
 }
 
