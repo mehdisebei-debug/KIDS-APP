@@ -96,11 +96,12 @@ scénarios numérotés de [quickstart.md](./quickstart.md).
 
 - [ ] T020 [P] [US3] Créer components/filters/CategoryBar.tsx selon contracts/ui-components.md : props `value: Category | null`, `onChange` ; puce « Tous » puis une `Chip tone={category}` par catégorie de `CATEGORY_LABELS` ; conteneur `flex gap-2 overflow-x-auto scrollbar-none -mx-4 px-4` sans débordement de page ; toucher la catégorie active la désélectionne
 - [ ] T021 [P] [US3] Créer lib/data/events.ts avec `export async function getUpcomingEvents(limit = 6): Promise<{ events: EventRow[]; error: string | null }>` en déplaçant tel quel le code de l'ancien app/(public)/page.tsx (client `createPublicServerClient`, filtre `date_end >= maintenant`, tri `date_start`, retour `{ events: [], error }` si config absente) ; commentaire « serveur uniquement »
-- [ ] T022 [P] [US3] Réécrire components/activity/ActivityCard.tsx (carte complète) : props `activity`, `distanceKm?: number | null` ; `rounded-card bg-white shadow-card overflow-hidden` ; zone image `h-40` : `<Image fill unoptimized>` si `activity.images[0]`, sinon placeholder `CATEGORY_STYLES[cat].bg` + grand emoji ; `CategoryBadge` en surimpression en haut à gauche ; nom `font-display font-extrabold text-ink line-clamp-2` ; ligne « adresse · distance » `text-muted text-sm` (distance masquée si absente) ; `StarRating` ; âge (`ageRangeLabel`) et prix (`priceLabel`) ; lien vers `/activite/${id}`
+- [ ] T022 [P] [US3] Réécrire components/activity/ActivityCard.tsx (carte complète) : props `activity` ; `rounded-card bg-white shadow-card overflow-hidden` ; zone image `h-40` : `<Image fill unoptimized>` si `activity.images[0]`, sinon placeholder `CATEGORY_STYLES[cat].bg` + grand emoji ; `CategoryBadge` en surimpression en haut à gauche ; nom `font-display font-extrabold text-ink line-clamp-2` ; ligne adresse `text-muted text-sm` (aucune distance, research R11) ; `StarRating` ; âge (`ageRangeLabel`) et prix (`priceLabel`) ; lien vers `/activite/${id}`
 - [ ] T023 [P] [US3] Réécrire components/activity/EventCard.tsx dans le même langage que T022 : date + ville en tête `text-brand-ink text-xs font-bold uppercase`, image `<Image fill unoptimized>` ou placeholder `CATEGORY_STYLES.EVENEMENT`, badge Événements, pas d'étoiles, âge + prix ; lien `/evenement/${id}`
 - [ ] T024 [US3] Mettre à jour components/activity/ActivityList.tsx : props `activities`, `loading`, `error`, `emptyHint?` ; loading = 3 squelettes `rounded-card bg-surface animate-pulse` ; error = `ErrorState` ; empty = `EmptyState` emoji 🔍, titre « Aucun résultat », hint « Essayez un autre mot-clé » ; grille `grid gap-3 md:grid-cols-2 lg:grid-cols-3`
 - [ ] T025 [US3] Réécrire components/filters/FilterBar.tsx : champ recherche `rounded-full bg-white shadow-card min-h-11` avec 🔍, placeholder « Rechercher une activité, un lieu… » ; `CategoryBar` ; conserver le filtre d'âge actuel (sélecteurs) restylé et la case « Gratuit uniquement » en `Chip` — les tranches d'âge arrivent en Phase 5
-- [ ] T026 [US3] Transformer app/(public)/liste/page.tsx en Server Component « Explorer » : `export const dynamic = 'force-dynamic'`, appelle `getUpcomingEvents()` (T021) et rend `<ExplorerContent events={…} eventsError={…} />` dans `Suspense` ; créer app/(public)/liste/ExplorerContent.tsx (`'use client'`) qui reprend l'ancienne logique (filtres initialisés depuis `?categorie=`, `useActivities`) et ajoute la synchronisation URL via `router.replace` (`categorie`, `q`, `gratuit`) ; titre « Explorer » `font-display`, compteur `text-muted` ; section « Événements à venir » (grille d'`EventCard`, états error/empty stylés) affichée quand aucune catégorie n'est choisie ou quand `categorie=EVENEMENT` ; commentaire sur le passage de données serveur → client en props (spécificité Next.js)
+- [ ] T026 [US3] Transformer app/(public)/liste/page.tsx en Server Component « Explorer » : `export const dynamic = 'force-dynamic'`, appelle `getUpcomingEvents()` (T021) et rend `<ExplorerContent events={…} eventsError={…} />` dans `Suspense` ; créer app/(public)/liste/ExplorerContent.tsx (`'use client'`) qui reprend l'ancienne logique (filtres initialisés depuis `?categorie=`, `useActivities`) et ajoute la synchronisation URL via `router.replace` (`categorie`, `q`, `gratuit`) ; titre « Explorer » `font-display`, compteur `text-muted` ; section « Événements à venir » (grille d'`EventCard`, états error/empty stylés) affichée quand aucune catégorie n'est choisie ou quand `categorie=EVENEMENT`, et filtrée par `q` (insensible à la casse) sur `title`, `description`, `venue_name` et `city` — état vide de la section si aucun événement ne correspond (research R14) ; commentaire sur le passage de données serveur → client en props (spécificité Next.js)
+- [ ] T056 [US3] Dans hooks/useActivities.ts, étendre la recherche par mot-clé à `activity.address` (en plus de `name`, `description`, `tags`), insensible à la casse ; commentaire renvoyant à research R14 (FR-006)
 
 ### Implementation — story 1d (fiche détail)
 
@@ -124,15 +125,14 @@ scénarios numérotés de [quickstart.md](./quickstart.md).
 ### Implementation — story 2a (tranches d'âge)
 
 - [ ] T033 [US2] Ajouter dans lib/types/ui.ts `type AgeGroupId = '0-6m' | '6-12m' | '1-2a' | '2-3a' | '3-4a' | '4-5a' | '5-6a'`, `interface AgeGroup { id: AgeGroupId; label: string; emoji: string; min_months: number /* incluse */; max_months: number /* exclue */ }` et `AGE_GROUPS` avec les valeurs exactes de data-model.md §3 : 0–6 mois 🍼 [0,6) · 6m–1 an 🧸 [6,12) · 1–2 ans 🚶 [12,24) · 2–3 ans 🎠 [24,36) · 3–4 ans 🎨 [36,48) · 4–5 ans 🚲 [48,60) · 5–6 ans ⚽ [60,72)
-- [ ] T034 [US2] Dans lib/types/activity.ts remplacer `age_min`/`age_max` (années) de `FilterState` par `age_group: AgeGroupId | null` (commentaire « tranche définie en mois, null = tous âges ») ; dans lib/utils/format.ts ajouter `export function matchesAgeGroup(ageMinMonths: number, ageMaxMonths: number, group: AgeGroup): boolean` = `ageMinMonths < group.max_months && ageMaxMonths >= group.min_months`, et `parseAgeGroupId(value: string | null): AgeGroupId | null` ; supprimer `yearsToMonths` s'il n'est plus utilisé
-- [ ] T035 [US2] Mettre à jour hooks/useActivities.ts pour filtrer avec `matchesAgeGroup` quand `filters.age_group` est non nul (plus aucune conversion années→mois) ; adapter les valeurs `DEFAULT_FILTERS` de app/(public)/liste/ExplorerContent.tsx et app/(public)/carte/page.tsx (`age_group: null`)
+- [ ] T034 [US2] Dans lib/types/activity.ts remplacer `age_min`/`age_max` (années) de `FilterState` par `age_group: AgeGroupId | null` (commentaire « tranche définie en mois, null = tous âges ») et **supprimer `distance_km`** (filtre de rayon jamais utilisé, aucune distance dans l'app) ; dans lib/utils/format.ts ajouter `export function matchesAgeGroup(ageMinMonths: number, ageMaxMonths: number, group: AgeGroup): boolean` = `ageMinMonths < group.max_months && ageMaxMonths >= group.min_months`, et `parseAgeGroupId(value: string | null): AgeGroupId | null` ; supprimer `yearsToMonths` s'il n'est plus utilisé
+- [ ] T035 [US2] Mettre à jour hooks/useActivities.ts pour filtrer avec `matchesAgeGroup` quand `filters.age_group` est non nul (plus aucune conversion années→mois) ; adapter les valeurs `DEFAULT_FILTERS` de app/(public)/liste/ExplorerContent.tsx et app/(public)/carte/page.tsx (`age_group: null`, retirer `distance_km: 20`)
 - [ ] T036 [P] [US2] Créer components/filters/AgeGroupChips.tsx : props `value: AgeGroupId | null`, `onChange` ; une `Chip` par `AGE_GROUPS` (emoji + label), défilement horizontal `scrollbar-none` ; toucher la tranche active → `onChange(null)`
 - [ ] T037 [US2] Dans components/filters/FilterBar.tsx remplacer les sélecteurs d'âge en années par `AgeGroupChips` ; dans app/(public)/liste/ExplorerContent.tsx lire/écrire `?age=` via `parseAgeGroupId` et `router.replace`
-- [ ] T038 [US2] Mettre à jour CLAUDE.md (section « Types principaux » : `FilterState.age_group` en mois ; section « Règles importantes » : préciser que les tranches d'âge UI sont définies en mois) — écart documenté dans plan.md « Note principe II »
+- [ ] T038 [US2] Mettre à jour CLAUDE.md (section « Types principaux » : `FilterState.age_group` en mois et suppression de `distance_km` ; section « Règles importantes » : préciser que les tranches d'âge UI sont définies en mois) — écart documenté dans plan.md « Note principe II »
 
 ### Implementation — story 2b (carte plein écran)
 
-- [ ] T039 [P] [US2] Créer lib/utils/geo.ts : `distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number` (haversine) et `formatDistance(km: number): string` (« 850 m », « 1,2 km »)
 - [ ] T040 [P] [US2] Créer hooks/useGeolocation.ts selon contracts/ui-components.md : retourne `{ position, status: 'idle' | 'pending' | 'granted' | 'denied' | 'unavailable', request }` ; `navigator.geolocation.getCurrentPosition` appelé **uniquement** dans `request()` ; aucune persistance
 - [ ] T041 [US2] Refondre components/activity/ActivityMap.tsx selon contracts/ui-components.md : props `activities`, `loading`, `error`, `selectedId`, `onSelect`, `userPosition?` ; style `mapbox://styles/mapbox/light-v11` ; hauteur 100 % du parent (plus de `h-[70vh]` ni `rounded-3xl`) ; marqueur = `button` 40 px rond `CATEGORY_STYLES[cat].solid` bordure blanche + emoji, zone tactile 44 px, `aria-label` nom + catégorie ; marqueur sélectionné agrandi (`scale-125`, `z-10`) avec étiquette du nom `bg-ink text-white rounded-full text-xs font-display` au-dessus ; supprimer la `Popup` ; point bleu `accent` pour `userPosition` ; clic carte vide → `onSelect(null)` ; garder les états token absent / erreur / chargement avec `ErrorState` et lien vers `/liste`
 - [ ] T042 [US2] Ajouter dans components/activity/ActivityMap.tsx un bouton flottant « me localiser » (rond 48 px, `bg-white shadow-raised`, icône 📍 `text-accent`) qui appelle une prop `onLocate` et, quand `userPosition` change, `mapRef.current?.flyTo({ center, zoom: 13 })` ; si `status === 'denied'`, afficher une bulle « Activez la localisation dans les réglages de votre navigateur » et ne pas déplacer la carte
@@ -140,10 +140,9 @@ scénarios numérotés de [quickstart.md](./quickstart.md).
 
 ### Implementation — story 2c (panneau bas)
 
-- [ ] T044 [P] [US2] Créer components/activity/ActivityCardCompact.tsx : props `activity`, `distanceKm?`, `selected?` ; largeur `w-60 shrink-0 snap-start`, image `h-28` ou placeholder catégorie, `CategoryBadge`, nom `line-clamp-1 font-display`, « adresse · distance », `StarRating` ; `ring-2` couleur catégorie si `selected` ; lien vers la fiche
+- [ ] T044 [P] [US2] Créer components/activity/ActivityCardCompact.tsx : props `activity`, `selected?` ; largeur `w-60 shrink-0 snap-start`, image `h-28` ou placeholder catégorie, `CategoryBadge`, nom `line-clamp-1 font-display`, adresse, `StarRating` ; `ring-2` couleur catégorie si `selected` ; lien vers la fiche
 - [ ] T045 [P] [US2] Créer components/layout/BottomSheet.tsx (`'use client'`) selon contracts/ui-components.md : props `expanded`, `onExpandedChange`, `header`, `children` ; replié ≈ 220 px, déplié ≈ 65 dvh, transition CSS `transform` 300 ms ; poignée `button` `aria-expanded` `aria-label` « Afficher la liste / la carte » ; glissé vertical via pointer events, seuil 40 px ; `rounded-t-sheet bg-cream shadow-raised` ; positionné au-dessus de la BottomNav sans la recouvrir
 - [ ] T046 [US2] Intégrer dans app/(public)/carte/page.tsx : `BottomSheet` avec en en-tête le compteur ; replié = rangée `flex gap-3 overflow-x-auto snap-x scrollbar-none` d'`ActivityCardCompact` ; déplié = `ActivityList` ; sélection d'un marqueur → déplie pas, mais fait défiler la rangée jusqu'à la carte compacte (`scrollIntoView({ inline: 'center', behavior: 'smooth' })`) et la marque `selected`
-- [ ] T047 [US2] Calculer `distanceKm` (T039) depuis `userPosition` dans app/(public)/carte/page.tsx et app/(public)/liste/ExplorerContent.tsx, le passer à `ActivityCard`/`ActivityCardCompact` ; aucune distance affichée sans position
 
 **Checkpoint**: lot 2 complet — quickstart 13 à 23 OK ; lint/type-check/build verts
 
@@ -188,21 +187,21 @@ scénarios numérotés de [quickstart.md](./quickstart.md).
 - T010 → T015, T016 ; T011 → T020, T036 ; T012/T013 → T022, T023, T029, T044
 - T021 → T026 ; T017 doit être livré avec T026 (les événements ne doivent pas disparaître)
 - T027, T028 → T029 → T030, T031
-- T033 → T034 → T035 → T036/T037 ; T039, T040 → T041 → T042 → T043 → T046 → T047
+- T033 → T034 → T035 → T036/T037 ; T040 → T041 → T042 → T043 → T046
 
 ### Parallel Opportunities
 
 - Phase 2 : T004 ∥ T007 (fichiers différents), puis T005 → T006/T008
 - Phase 3 : T010, T011, T012, T013, T014 en parallèle
 - Phase 4 : T020, T021, T022, T023, T027, T028, T032 en parallèle
-- Phase 5 : T036, T039, T040, T044, T045 en parallèle une fois T033–T035 faits
+- Phase 5 : T036, T040, T044, T045 en parallèle une fois T033–T035 faits
 
 ### Exemple parallèle — User Story 3
 
 ```text
 Ensemble : T020 CategoryBar · T021 lib/data/events.ts · T022 ActivityCard · T023 EventCard
            T027 directionsUrl/staticMapUrl · T028 ShareButton · T032 not-found
-Puis     : T024 → T025 → T026 (Explorer) ; T029 → T030, T031 (fiches)
+Puis     : T024 → T025 → T026 (Explorer), T056 en parallèle (recherche) ; T029 → T030, T031 (fiches)
 ```
 
 ---
@@ -221,11 +220,11 @@ Puis     : T024 → T025 → T026 (Explorer) ; T029 → T030, T031 (fiches)
 |---|---|---|
 | 1a Fondations | T004–T009, T010–T014 | build vert, fond crème, admin intact |
 | 1b Navigation | T015, T016, T018, T019 | quickstart 2, 3, 12 |
-| 1c Cartes + Explorer | T017, T020–T026 | quickstart 1, 4–7 |
+| 1c Cartes + Explorer | T017, T020–T026, T056 | quickstart 1, 4–7 |
 | 1d Fiche détail | T027–T032 | quickstart 8–11 |
 | 2a Tranches d'âge | T033–T038 | quickstart 14–16, 22 |
-| 2b Carte plein écran | T039–T043 | quickstart 13, 17, 19–21, 23 |
-| 2c Panneau bas | T044–T047 | quickstart 18, distances |
+| 2b Carte plein écran | T040–T043 | quickstart 13, 17, 19–21, 23 |
+| 2c Panneau bas | T044–T046 | quickstart 18 |
 
 Chaque PR : `Closes #<num>`, lint/type-check/build verts, review, `QA: GO`, merge squash sur
 ordre humain (contrat `CLAUDE.md`).
@@ -234,6 +233,9 @@ ordre humain (contrat `CLAUDE.md`).
 
 ## Notes
 
+- T039 (`lib/utils/geo.ts`) et T047 (calcul de distance) sont **supprimées** : aucune distance
+  n'est affichée (décision du porteur, clarification spec 2026-11-01). Les numéros ne sont pas
+  réattribués.
 - Aucune nouvelle dépendance npm dans les lots 1–2 (polices via `next/font`, intégré à Next).
 - La mise à jour de `CLAUDE.md` (`FilterState.age_group`) est faite en T038 (lot 2, story 2a),
   au moment où `FilterState` change.

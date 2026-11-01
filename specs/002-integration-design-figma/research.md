@@ -82,8 +82,9 @@ texte ≥ 18,7 px gras et les éléments non textuels) :
 - **Decision** : `getUpcomingEvents()` est extrait dans `lib/data/events.ts`. La page `/liste`
   devient un Server Component qui récupère les événements et les passe à un composant client
   `ExplorerContent` (filtres + liste d'activités). Les événements s'affichent en section
-  « Événements à venir » en tête d'Explorer, et seuls quand le filtre catégorie vaut
-  `EVENEMENT`.
+  « Événements à venir » en tête d'Explorer quand le filtre catégorie est « Tous » (aucune
+  catégorie) ou `EVENEMENT`, et sont masqués pour toute autre catégorie (clarification spec
+  2026-11-01, FR-006). La Carte n'affiche pas d'événements.
 - **Rationale** : aucune donnée ne disparaît avec l'Accueil ; même mécanisme serveur qu'aujourd'hui
   (états error/empty déjà gérés). *Spécificité Next.js* : un Server Component peut charger des
   données puis rendre un Client Component avec ces données en props.
@@ -135,14 +136,14 @@ texte ≥ 18,7 px gras et les éléments non textuels) :
 - **Rationale** : deux états suffisent (maquette), pas de librairie, animation fluide sur mobile.
 - **Alternatives** : librairie de bottom sheet (dépendance) ; trois crans (non demandé).
 
-## R11. Distance et géolocalisation
+## R11. Géolocalisation (sans distance)
 
 - **Decision** : `useGeolocation` demande la position uniquement au toucher du bouton
-  « me localiser » (jamais au chargement) ; distance calculée côté client (haversine,
-  `lib/utils/geo.ts`) et affichée sur les cartes si la position est connue, masquée sinon.
-  Sur la fiche détail (rendue côté serveur), la distance n'est pas affichée au lot 1 ; elle
-  l'est au lot 2 via un petit composant client si la position est déjà accordée.
-- **Rationale** : pas de demande de permission intrusive ; la fiche reste rapide (serveur).
+  « me localiser » (jamais au chargement) et ne sert **qu'au recentrage** de la Carte. Aucune
+  distance n'est calculée ni affichée, nulle part (décision du porteur, clarification spec
+  2026-11-01) : pas de `lib/utils/geo.ts`.
+- **Rationale** : pas de demande de permission intrusive ; moins de code et de cas limites
+  (position inconnue, fiche rendue côté serveur).
 - **Alternatives** : géolocalisation par IP (imprécis, tiers) ; RPC `get_nearby_activities`
   (activités encore en mock, reporté au branchement Supabase).
 
@@ -169,3 +170,16 @@ texte ≥ 18,7 px gras et les éléments non textuels) :
   contrôle de contraste dans les DevTools (Lighthouse Accessibilité ≥ 95 sur Carte, Explorer,
   fiche) et un Lighthouse Performance mobile avant/après pour SC-006.
 - **Rationale** : cohérent avec la « limite connue » de la constitution.
+
+## R14. Recherche par mot-clé (FR-006)
+
+- **Decision** : recherche insensible à la casse, par sous-chaîne, sur `name`, `description`,
+  `address` et `tags` des activités (ajout de `address`, absent de `useActivities` aujourd'hui),
+  et sur `title`, `description`, `venue_name` et `city` des événements. Le même `q` filtre la
+  liste d'activités **et** la section « Événements à venir » ; le filtrage des événements se fait
+  côté client dans `ExplorerContent`, sur les événements déjà chargés par `getUpcomingEvents()`.
+- **Rationale** : un parent cherche surtout un lieu ou un thème (clarification spec 2026-11-01) ;
+  le volume actuel ne justifie pas `pg_trgm`. *Limite* : seuls les événements chargés (limite de
+  `getUpcomingEvents`) sont cherchés.
+- **Alternatives** : recherche serveur `pg_trgm` (prévue dans la stack, à réserver à un volume
+  plus important) ; nom seul (rejeté en clarification).

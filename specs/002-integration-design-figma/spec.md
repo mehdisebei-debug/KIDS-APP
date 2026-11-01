@@ -31,6 +31,18 @@ conservant les données réelles et les parcours existants.
 - Q: Favoris et Profil dans le périmètre ? → A: Oui, avec connexion du parent (FR-012).
 - Précision du porteur : la partie connexion est isolée en stories basse priorité (US6, US7,
   lot 5), à discuter ultérieurement (FR-018).
+- Q: Où les événements apparaissent-ils dans la nouvelle navigation ? → A: Explorer, section
+  « Événements à venir » en tête quand le filtre catégorie est Tous ou Événements ; Carte :
+  activités seulement (FR-005, FR-006).
+- Q: Quand une activité est-elle adaptée à une tranche d'âge choisie ? → A: Dès que sa plage
+  d'âge chevauche la tranche, bornes comprises (« 0–24 mois » apparaît aussi dans « 2–3 ans »)
+  (FR-011).
+- Q: Sur quelles informations porte la recherche par mot-clé d'Explorer ? → A: Nom,
+  description, adresse/ville et tags des activités, et titre, description et lieu des événements ;
+  la section « Événements à venir » est filtrée elle aussi (FR-006).
+- Q: La distance entre le parent et l'activité est-elle affichée ? → A: Non, nulle part (ni
+  cartes, ni panneau bas, ni fiche) ; la géolocalisation sert uniquement au recentrage de la
+  carte (FR-007, Assumptions).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -90,8 +102,8 @@ fiche depuis le panneau.
 ### User Story 3 - Explorer la liste et consulter une fiche (Priority: P1)
 
 Un parent ouvre l'onglet Explorer, cherche par mot-clé, filtre par catégorie, parcourt des cartes
-complètes (photo, catégorie, nom, lieu, distance, note, âge, prix) puis ouvre la fiche détail :
-grande photo, note, description, lieu, tarif, horaires, âge, distance, bloc « Localisation »,
+complètes (photo, catégorie, nom, lieu, note, âge, prix) puis ouvre la fiche détail :
+grande photo, note, description, lieu, tarif, horaires, âge, bloc « Localisation »,
 bouton « Voir l'itinéraire », lien vers le site, retour aux activités.
 
 **Why this priority**: c'est le second chemin de découverte et la page de décision.
@@ -101,8 +113,9 @@ maquette et que « Voir l'itinéraire » et le lien de partage fonctionnent.
 
 **Acceptance Scenarios**:
 
-1. **Given** l'onglet Explorer, **When** le parent tape un mot-clé, **Then** la liste se filtre ;
-   sans résultat, l'état vide « Aucun résultat — Essayez un autre mot-clé » s'affiche.
+1. **Given** l'onglet Explorer, **When** le parent tape un mot-clé (nom, ville, thème…), **Then**
+   les activités et les événements à venir se filtrent ; sans résultat, l'état vide « Aucun
+   résultat — Essayez un autre mot-clé » s'affiche.
 2. **Given** une fiche ouverte, **When** le parent touche « Voir l'itinéraire », **Then** un
    itinéraire vers l'adresse de l'activité s'ouvre dans l'application de cartographie du téléphone.
 3. **Given** une fiche ouverte, **When** le parent partage son adresse, **Then** le lien rouvre
@@ -206,8 +219,9 @@ desktop et l'absence de défilement horizontal.
 ### Edge Cases
 
 - Le parent refuse la géolocalisation : la carte reste centrée sur Paris, le bouton « me
-  localiser » explique comment l'activer, les distances ne sont pas affichées.
-- Une activité couvre plusieurs tranches d'âge : elle apparaît dans chacune d'elles.
+  localiser » explique comment l'activer.
+- Une activité couvre plusieurs tranches d'âge : elle apparaît dans chacune d'elles, y compris
+  celle qui commence exactement à son âge maximum (règle de FR-011).
 - Une activité sans coordonnées : elle est listée dans Explorer mais n'a pas de marqueur.
 - Nom d'activité ou adresse très long : passage à la ligne ou troncature sans casser la carte.
 - Beaucoup de marqueurs proches : ils restent touchables (pas de superposition illisible).
@@ -246,10 +260,15 @@ desktop et l'absence de défilement horizontal.
 - **FR-005**: L'écran Carte DOIT offrir : puces de tranche d'âge (7 tranches de 0 à 6 ans),
   barre de catégories, marqueurs colorés par catégorie, bouton de recentrage, compteur
   « N activités · tranche », panneau bas repliable (cartes compactes horizontales ↔ liste).
+  La Carte n'affiche que les activités ; les événements n'y ont pas de marqueur.
 - **FR-006**: L'écran Explorer DOIT offrir recherche par mot-clé, filtre catégorie et liste de
-  cartes complètes.
+  cartes complètes. Une section « Événements à venir » DOIT apparaître en tête d'Explorer quand le
+  filtre catégorie est « Tous » ou « Événements », et être masquée pour toute autre catégorie.
+  La recherche par mot-clé DOIT porter sur le nom, la description, l'adresse (dont la ville) et les
+  tags des activités, ainsi que sur le titre, la description et le lieu des événements ; elle
+  filtre à la fois la liste d'activités et la section « Événements à venir ».
 - **FR-007**: La fiche détail (activité et événement) DOIT être une page complète avec lien
-  partageable, et afficher photo, note, description, lieu, tarif, horaires, âge, distance, bloc
+  partageable, et afficher photo, note, description, lieu, tarif, horaires, âge, bloc
   Localisation, « Voir l'itinéraire », site web et retour ; les blocs sans donnée sont masqués.
 - **FR-008**: La livraison DOIT se faire **par lots**, chacun livrable et utilisable seul :
   - **Lot 1** : fondations, navigation 4 onglets, cartes d'activité, Explorer, fiche détail
@@ -268,7 +287,10 @@ desktop et l'absence de défilement horizontal.
 - **FR-010**: Chaque écran DOIT être conçu pour 375 px d'abord, sans défilement horizontal, avec
   des zones tactiles d'au moins 44 × 44 px.
 - **FR-011**: Les tranches d'âge DOIVENT reposer sur les âges existants exprimés en mois
-  (bornes 0, 6, 12, 24, 36, 48, 60, 72) ; seuls les libellés sont en mois ou en années.
+  (bornes 0, 6, 12, 24, 36, 48, 60, 72) ; seuls les libellés sont en mois ou en années. Chaque
+  tranche couvre de sa borne basse (incluse) à sa borne haute (exclue), ex. « 2–3 ans » = 24 à
+  35 mois. Une activité correspond à une tranche dès que sa plage d'âge la chevauche, son âge
+  maximum étant inclus : « 0–24 mois » apparaît dans 0–6 m, 6–12 m, 1–2 ans et 2–3 ans.
 - **FR-012**: Favoris et Profil sont **inclus** (lot 3) pour un parent connecté :
   - consulter la carte, Explorer et les fiches reste possible sans compte ;
   - les favoris et le profil enfant sont rattachés au compte du parent ;
@@ -323,6 +345,8 @@ desktop et l'absence de défilement horizontal.
 - La carte de la maquette est une illustration stylisée : on reprend son style (marqueurs,
   couleurs, recentrage) sur la vraie carte interactive existante, pas l'illustration elle-même.
 - Le nom affiché « KidMap Paris » et le logo de la maquette sont repris, sauf avis contraire.
+- Aucune distance n'est affichée (cartes, panneau bas, fiche), même si la maquette en montre :
+  la position du parent sert uniquement au bouton « me localiser » de la Carte.
 - La cloche de notifications de l'en-tête et les préférences de notification du Profil sont
   masquées (pas de notifications dans ce périmètre) ; l'avatar mène au Profil.
 - Les statistiques du Profil de la maquette (compteurs) sont hors périmètre.

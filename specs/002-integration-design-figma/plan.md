@@ -124,20 +124,19 @@ components/
 
 lib/
 ├── types/
-│   ├── activity.ts                # MODIFIÉ : FilterState.age_group, CATEGORY_STYLES
+│   ├── activity.ts                # MODIFIÉ : FilterState.age_group (sans distance_km), CATEGORY_STYLES
 │   └── ui.ts                      # NOUVEAU : AgeGroup, TabItem
 ├── utils/
-│   ├── format.ts                  # MODIFIÉ : ageGroupOf, matchesAgeGroup, directionsUrl
-│   └── geo.ts                     # NOUVEAU (lot 2) : distanceKm (haversine), formatDistance
+│   └── format.ts                  # MODIFIÉ : ageGroupOf, matchesAgeGroup, directionsUrl
 └── data/events.ts                 # NOUVEAU : getUpcomingEvents() extrait de l'ancien Accueil
 
 hooks/
-├── useActivities.ts               # MODIFIÉ : filtre par age_group
+├── useActivities.ts               # MODIFIÉ : filtre par age_group + recherche sur l'adresse (R14)
 └── useGeolocation.ts              # NOUVEAU (lot 2) : position + état de permission
 
 tailwind.config.ts                 # MODIFIÉ : couleurs, polices, rayons, ombres de la maquette
 next.config.mjs                    # INCHANGÉ (images externes servies en unoptimized, comme aujourd'hui)
-CLAUDE.md                          # MODIFIÉ : FilterState (age_group en mois)
+CLAUDE.md                          # MODIFIÉ : FilterState (age_group en mois, distance_km supprimé)
 ```
 
 **Structure Decision**: on reste dans l'arborescence décrite par `CLAUDE.md`. Seul ajout de
@@ -156,7 +155,7 @@ liens existants ; seule `/` redirige.
 | | 1d Fiche détail | `ActivityDetail`, fiches activité et événement, itinéraire, partage, mini-carte statique | 1a |
 | **2** | 2a Tranches d'âge | `AgeGroup`, `FilterState.age_group`, `AgeGroupChips` (aussi dans Explorer) | 1c |
 | | 2b Carte plein écran | marqueurs catégorie, label sélection, recentrage `useGeolocation`, compteur, état vide | 2a |
-| | 2c Panneau bas | `BottomSheet` replié (cartes compactes) / déplié (liste), distance | 2b |
+| | 2c Panneau bas | `BottomSheet` replié (cartes compactes) / déplié (liste) | 2b |
 | 3 *(esquisse)* | Favoris, Profil enfant | tables `favorites`, `child_profiles` + RLS, onglets visibles, présélection d'âge | 5 |
 | 4 *(esquisse)* | Desktop ≥ 1024 px | barre latérale, Carte deux panneaux synchronisés, grilles, fiche deux colonnes | 2 |
 | 5 *(esquisse, à discuter)* | Connexion parent | méthodes, invitation au bon moment, retour à l'écran d'origine | discussion |

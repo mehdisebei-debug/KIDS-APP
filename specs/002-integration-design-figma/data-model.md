@@ -87,7 +87,7 @@ apparaître dans plusieurs tranches (edge case de la spec).
 interface FilterState {
   category: Category | null
   age_group: AgeGroupId | null   // remplace age_min / age_max (années) — tranche en mois
-  distance_km: number
+  // distance_km supprimé : aucun filtre ni affichage de distance (décision du porteur)
   price_max: number | null
   search_query: string
 }
@@ -117,7 +117,7 @@ interface TabItem {
   `images` vide / `image_url` null → placeholder catégorie ; `opening_hours` vide → pas de bloc
   Horaires ; pas de `avg_rating` (événements) → pas d'étoiles ; `lat/lng` absents → pas de
   mini-carte ni de marqueur, itinéraire sur l'adresse.
-- Distance : dérivée côté client (jamais stockée) à partir de la position du parent.
+- Distance : **non affichée** (décision du porteur) ; aucune donnée de distance n'est calculée.
 
 ## 7. Esquisse lot 3 (à détailler dans un plan ultérieur)
 

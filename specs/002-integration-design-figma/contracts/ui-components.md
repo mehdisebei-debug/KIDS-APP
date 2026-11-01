@@ -19,8 +19,8 @@ Le rendu attendu de chacun est celui décrit dans [maquette-figma.md](../maquett
 
 | Composant | Props | Garanties |
 |---|---|---|
-| `ActivityCard` | `activity: Activity`, `distanceKm?: number \| null` | carte complète : image ou placeholder catégorie, badge, nom (Nunito), lieu · distance, note, âge, prix ; lien vers la fiche |
-| `ActivityCardCompact` *(lot 2)* | `activity: Activity`, `distanceKm?: number \| null`, `selected?: boolean` | largeur fixe ~240 px pour le défilement horizontal ; bordure couleur catégorie si `selected` |
+| `ActivityCard` | `activity: Activity` | carte complète : image ou placeholder catégorie, badge, nom (Nunito), lieu, note, âge, prix ; lien vers la fiche |
+| `ActivityCardCompact` *(lot 2)* | `activity: Activity`, `selected?: boolean` | largeur fixe ~240 px pour le défilement horizontal ; bordure couleur catégorie si `selected` |
 | `EventCard` | `event: EventRow` | même langage visuel ; date en tête ; pas d'étoiles |
 | `ActivityList` | `activities: Activity[]`, `loading: boolean`, `error: string \| null`, `emptyHint?: string` | loading = squelettes, error = `ErrorState`, empty = `EmptyState` « Aucun résultat — Essayez un autre mot-clé » |
 | `ActivityDetail` | `kind: 'activity' \| 'event'`, `title`, `category`, `imageUrl?`, `rating?`, `description?`, `infos: { label: string; value: string; emoji: string }[]`, `location?: { lat: number; lng: number; address: string }`, `website?`, `backHref` | page complète ; blocs sans donnée masqués ; « Voir l'itinéraire » + `ShareButton` |
@@ -46,5 +46,5 @@ Le rendu attendu de chacun est celui décrit dans [maquette-figma.md](../maquett
 
 | Hook | Signature | Garanties |
 |---|---|---|
-| `useActivities` | `(filters: FilterState) => { activities, loading, error }` | filtre par `age_group` selon la règle de chevauchement en mois |
+| `useActivities` | `(filters: FilterState) => { activities, loading, error }` | filtre par `age_group` selon la règle de chevauchement en mois ; recherche `search_query` sur `name`, `description`, `address`, `tags` (research R14) |
 | `useGeolocation` *(lot 2)* | `() => { position, status: 'idle' \| 'pending' \| 'granted' \| 'denied' \| 'unavailable', request: () => void }` | ne demande la permission que sur `request()` ; ne stocke rien |
