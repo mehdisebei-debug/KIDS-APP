@@ -42,7 +42,7 @@ suivante par une **porte de qualité**.
 flowchart LR
     A([💡 Idée / besoin]) --> B{Grosse feature ?}
     B -- oui --> C[Spec-Kit<br/>specify → plan → tasks]
-    B -- non --> D[/new-story/]
+    B -- non --> D["/new-story"]
     C --> D2[Issues GitHub<br/>taskstoissues]
     D --> E[📋 User Story<br/>Backlog → Ready]
     D2 --> E
@@ -132,11 +132,11 @@ flowchart LR
     subgraph Vercel["▲ Vercel"]
         RSC[Server Components<br/>force-dynamic]
         MW[middleware.ts<br/>garde /admin/*]
-        ADM[/admin/events<br/>Server Actions/]
+        ADM["/admin/events<br/>Server Actions"]
     end
     subgraph Supabase["🟢 Supabase"]
         DB[(PostgreSQL + PostGIS<br/>RLS activée)]
-        RPC[[get_nearby_activities]]
+        RPC[[get_nearby_activities<br/>à venir]]
     end
     subgraph Ext["🌐 Sources externes"]
         OA[OpenAgenda API]
@@ -145,11 +145,13 @@ flowchart LR
     end
     UI --> RSC --> DB
     MAP --> MB
-    RSC --> RPC --> DB
+    RSC -.-> RPC -.-> DB
     MW --> ADM --> DB
     OA -- "scripts/import-openagenda.ts<br/>(service role)" --> DB
-    SOC -- "Projet Claude + connecteur<br/>→ activities_drafts" --> DB
+    SOC -. "Projet Claude + connecteur<br/>→ activities_drafts (à venir)" .-> DB
 ```
+
+> Traits pointillés = cible pas encore implémentée sur `main` (RPC géospatiale, ingestion réseaux).
 
 Règles d'architecture qui découlent de la constitution :
 
@@ -198,6 +200,7 @@ flowchart TD
     G1 -- non --> CL[speckit-clarify<br/>≤ 5 questions] --> S2
     G1 -- oui --> P[speckit-plan<br/>plan.md + design]
     P --> G2{Gate : plan OK ?}
+    G2 -- non --> P
     G2 -- oui --> T[speckit-tasks<br/>tasks.md]
     T --> AN[speckit-analyze<br/>cohérence spec/plan/tasks]
     AN --> TI[speckit-taskstoissues<br/>→ issues GitHub]
@@ -216,8 +219,9 @@ flowchart TD
 6. `speckit-taskstoissues` → une issue par tâche/US, ensuite affinées par le `product-owner`.
 7. Plus tard, `speckit-converge` compare le code au plan et ajoute les tâches manquantes.
 
-> Exemple en cours : `specs/001-ingestion-sans-code/` (ingestion d'activités en brouillon depuis les
-> réseaux sociaux, validation humaine avant publication).
+> Exemple en cours de rédaction (pas encore versionné) : la spec `001-ingestion-sans-code` (ingestion
+> d'activités en brouillon depuis les réseaux sociaux, validation humaine avant publication). Le dossier
+> `specs/` est destiné à être commité avec sa feature.
 
 ---
 
@@ -262,7 +266,7 @@ Alors un message « Aucune activité » avec un bouton « Réinitialiser » s'af
 | Label | Valeurs |
 |---|---|
 | Type | `type: user-story` (toujours) |
-| Zone | `area: age-filter` · `area: map` · `area: admin` |
+| Zone | `area: age-filter` · `area: map` · `area: admin` · `area: events` |
 | Priorité | `priority: p1` (bloquant MVP) · `priority: p2` |
 | Statut | `status: ready` → `in-progress` → `review` → `qa` |
 
@@ -290,18 +294,18 @@ sequenceDiagram
     participant GIT as Git local
     participant CI as GitHub Actions
     DEV->>GH: gh issue list --label "status: ready"
-    DEV->>GH: label status: in-progress + carte "In Progress"
-    DEV->>GIT: git switch main && git pull
-    DEV->>GIT: git switch -c feat/<num>-slug
+    DEV->>GH: label status in-progress + carte In Progress
+    DEV->>GIT: git switch main puis git pull
+    DEV->>GIT: git switch -c feat/NUM-slug
     loop Implémentation
         DEV->>GIT: Edit / Write
         Note over GIT: Hook PostToolUse → npm run type-check
     end
     DEV->>GIT: npm run lint && npm run type-check && npm run build
     DEV->>GIT: git commit (Conventional Commits FR)
-    DEV->>GH: git push + gh pr create (body : Closes #<num>)
+    DEV->>GH: git push + gh pr create (corps avec Closes NUM)
     GH->>CI: déclenche le job test
-    DEV->>GH: label status: review + carte "In Review"
+    DEV->>GH: label status review + carte In Review
 ```
 
 ### Instructions pas à pas
@@ -409,13 +413,13 @@ sequenceDiagram
     participant H as Humain
     participant GH as GitHub
     participant V as Vercel
-    QA->>H: QA: GO — puis-je merger la PR #N ?
+    QA->>H: QA GO, puis-je merger la PR N ?
     H-->>QA: Oui, merge.
     QA->>GH: gh pr merge N --squash
-    Note over GH: ruleset protect-main :<br/>PR obligatoire · check "test" vert · squash
+    Note over GH: ruleset protect-main<br/>PR obligatoire, check test vert, squash
     GH->>V: push sur main → build de production
-    GH-->>GH: Closes #N ferme l'issue
-    QA->>GH: carte → "Deployed"
+    GH-->>GH: Closes N ferme l'issue
+    QA->>GH: carte → Deployed
     QA->>V: vérifie la feature en production
 ```
 
@@ -443,8 +447,8 @@ La valeur de l'app dépend de la fraîcheur des données. Trois canaux d'aliment
 flowchart LR
     OA[OpenAgenda] -->|npm run import:openagenda| EV[(events)]
     ADM[Admin /admin/events<br/>CRUD protégé] --> EV
-    SOC[Lien / capture<br/>réseaux sociaux] -->|Projet Claude<br/>+ confirmation « ok »| DR[(activities_drafts<br/>RLS sans policy)]
-    DR -->|validation humaine| ACT[(activities<br/>lecture publique)]
+    SOC[Lien / capture<br/>réseaux sociaux] -.->|Projet Claude<br/>+ confirmation « ok »| DR[(activities_drafts<br/>à venir · RLS sans policy)]
+    DR -.->|validation humaine| ACT[(activities<br/>à venir · lecture publique)]
     EV --> APP[App parents]
     ACT --> APP
 ```
@@ -453,13 +457,21 @@ flowchart LR
 |---|---|---|
 | Import OpenAgenda | `npm run import:openagenda` | Service role côté script uniquement |
 | Admin CRUD | `/admin/events` | `middleware.ts` + cookie `admin_session` (`ADMIN_PASSWORD`) |
-| Ingestion réseaux (spec 001) | Projet Claude + connecteur Supabase | Brouillons invisibles aux parents ; publication après validation |
+| Ingestion réseaux (spec 001, **à venir**) | Projet Claude + connecteur Supabase | Brouillons invisibles aux parents ; publication après validation |
+
+> Les traits pointillés du schéma désignent ce qui n'est pas encore sur `main`.
 
 ### Schéma de base
 
-Les scripts SQL sont versionnés dans `scripts/sql/` et appliqués manuellement dans l'éditeur SQL
-Supabase (ou via `supabase db push` si la CLI est installée). Toute modification de schéma passe par
-une US + PR comme le reste du code.
+Les scripts SQL sont versionnés dans `scripts/sql/` et appliqués **manuellement** dans l'éditeur SQL
+Supabase. (`supabase db push` n'applique que le dossier `supabase/migrations/`, qui n'existe pas encore :
+voir section 17.) Toute modification de schéma passe par une US + PR comme le reste du code.
+
+| Table | État sur `main` | Script |
+|---|---|---|
+| `events` | ✅ existante | `scripts/sql/create-events-table.sql` |
+| `activities` | ⏳ à venir (PR #18, US #13) | `scripts/sql/create-activities-tables.sql` |
+| `activities_drafts` | ⏳ à venir (PR #18, US #13) | `scripts/sql/create-activities-tables.sql` |
 
 ### Suivi en production
 
@@ -476,15 +488,15 @@ Chaque handoff = **changement de label** `status: *` **ET** **déplacement de ca
 ```mermaid
 stateDiagram-v2
     [*] --> Backlog : /new-story
-    Backlog --> Ready : INVEST OK<br/>+ status: ready
-    Ready --> InProgress : developer prend la carte<br/>status: in-progress
-    InProgress --> InReview : PR ouverte<br/>status: review
-    InReview --> InProgress : VERDICT: CHANGES_REQUESTED
-    InReview --> QA : VERDICT: APPROVED<br/>status: qa
-    QA --> InProgress : QA: NO-GO
-    QA --> Deployed : QA: GO + accord humain<br/>merge squash
-    InReview --> Escalade : > 2 boucles
-    QA --> Escalade : > 2 boucles
+    Backlog --> Ready : INVEST OK, label ready
+    Ready --> InProgress : developer prend la carte
+    InProgress --> InReview : PR ouverte
+    InReview --> InProgress : CHANGES_REQUESTED
+    InReview --> QA : APPROVED
+    QA --> InProgress : NO-GO
+    QA --> Deployed : GO + accord humain + squash
+    InReview --> Escalade : plus de 2 boucles
+    QA --> Escalade : plus de 2 boucles
     Escalade --> InProgress : décision humaine
     Deployed --> [*]
 ```
@@ -524,10 +536,11 @@ gitGraph
     checkout main
     merge feat/7-fiche-detail-evenement id: "squash #10"
     branch feat/13-tables-ingestion
-    commit id: "chore: SQL"
-    checkout main
-    merge feat/13-tables-ingestion id: "squash (à venir)"
+    commit id: "chore: SQL (PR 18 ouverte)"
 ```
+
+> Mermaid dessine des commits de merge ; dans le dépôt, chaque merge est en réalité un **squash**
+> (un seul commit `feat: … (#N)` sur `main`). La branche `feat/13-tables-ingestion` n'est pas encore mergée.
 
 | Élément | Convention | Exemple |
 |---|---|---|
@@ -565,8 +578,9 @@ flowchart LR
 | 6 | QA | Agent | ✅ | Commentaire issue + PR |
 | 7 | Accord humain | — | ✅ | Chat / PR |
 
-> Le build CI ne nécessite aucun secret : les pages qui lisent Supabase sont en `force-dynamic` et
-> `createServerClient()` renvoie `null` si l'environnement manque.
+> Le build CI ne nécessite aucun secret : les pages qui lisent Supabase sont en `force-dynamic`, et
+> `createServerClient()` comme `createPublicServerClient()` (`lib/supabase/server.ts`) renvoient
+> `null` si l'environnement manque.
 
 ---
 
@@ -578,7 +592,7 @@ flowchart TD
     S -- "Bloquant<br/>(page blanche, fuite)" --> RB[Vercel : Instant Rollback<br/>vers le déploiement précédent]
     RB --> FIX
     S -- "Non bloquant" --> ISS[Issue fix + priority: p1]
-    ISS --> FIX[Branche fix/&lt;num&gt;-slug]
+    ISS --> FIX[Branche fix/NUM-slug]
     FIX --> PIPE[Pipeline normal :<br/>review → QA → accord → squash]
     PIPE --> V[Vérif prod]
 ```
@@ -644,10 +658,11 @@ gh project item-list 1 --owner mehdisebei-debug --format json
 | Variable | Portée |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Client + serveur |
+| `SUPABASE_URL` | Serveur, optionnelle — prioritaire sur la précédente pour `createServerClient()` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client + serveur |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Serveur / scripts uniquement** |
 | `NEXT_PUBLIC_MAPBOX_TOKEN` | Client |
-| `GOOGLE_PLACES_API_KEY` | Scripts d'import uniquement |
+| `GOOGLE_PLACES_API_KEY` | Scripts d'import uniquement (script Google Places pas encore écrit) |
 | `ADMIN_PASSWORD` | Serveur (middleware admin) — ⚠️ absente de `.env.local.example`, à y ajouter |
 
 Modèle : `.env.local.example`.
@@ -665,6 +680,10 @@ Modèle : `.env.local.example`.
 | State management | Zustand / TanStack Query pas encore installés | À installer avec accord humain quand les filtres seront branchés |
 | Auth parents | Supabase Auth non branché (seul l'admin a un mot de passe) | US « profil + favoris » |
 | Migrations | SQL versionné dans `scripts/sql/`, appliqué à la main | Passer à `supabase/migrations` + `supabase db push` |
+| RPC géospatiale | `get_nearby_activities` ni définie en SQL versionné ni appelée | À créer avec la feature « autour de moi » |
+| Tables `activities` / `activities_drafts` | Uniquement dans la PR #18 (US #13) | Disponibles après merge |
+| Import Google Places | `scripts/import-google-places.ts` cité dans `CLAUDE.md` mais absent | US dédiée |
+| Dossier `docs/` | Absent de l'arborescence de `CLAUDE.md` | L'y ajouter dans une PR `chore:` séparée |
 | Previews | Pas de vérification systématique des Preview Deployments Vercel | Ajouter l'URL de preview au rapport QA |
 | Mobile natif | Hors MVP | React Native + Expo après le MVP web |
 
