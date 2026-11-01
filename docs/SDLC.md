@@ -13,6 +13,7 @@
 ## Sommaire
 
 1. [Vue d'ensemble](#1-vue-densemble)
+   - [1.1 Parcours complet, commande par commande](#11-parcours-complet-commande-par-commande)
 2. [Acteurs et outils](#2-acteurs-et-outils)
 3. [Architecture cible](#3-architecture-cible)
 4. [Phase 0 — Gouvernance](#4-phase-0--gouvernance)
@@ -42,7 +43,7 @@ suivante par une **porte de qualité**.
 flowchart LR
     A([💡 Idée / besoin]) --> B{Grosse feature ?}
     B -- oui --> C[Spec-Kit<br/>specify → plan → tasks]
-    B -- non --> D[/new-story/]
+    B -- non --> D["/new-story"]
     C --> D2[Issues GitHub<br/>taskstoissues]
     D --> E[📋 User Story<br/>Backlog → Ready]
     D2 --> E
@@ -68,6 +69,49 @@ flowchart LR
 | 5. QA | Tableau de preuves sur l'issue | `qa` | `QA: GO` + CI verte |
 | 6. Merge | Commit squash sur `main` | **Humain** | Accord explicite |
 | 7. Exploitation | Prod Vercel, données Supabase | Humain | Vérification prod |
+
+### 1.1 Parcours complet, commande par commande
+
+De l'idée que tu as en tête jusqu'à la feature en production. **Où** indique où taper la commande :
+💬 = dans Claude Code (chat), 🖥️ = dans le terminal.
+
+`<num>` = numéro de l'issue · `<pr>` = numéro de la PR · `<item-id>` = id de la carte dans le Project.
+
+| # | Étape | Où | Commande | Résultat attendu / à vérifier |
+|---|---|---|---|---|
+| **0** | **Partir d'une base propre** | 🖥️ | `git switch main && git pull` | `main` à jour, `git status` sans changement en cours |
+| 0b | Vérifier que tout est vert avant de commencer | 🖥️ | `npm run lint && npm run type-check && npm run build` | 3 commandes vertes |
+| **1** | **Choisir le chemin** | — | Petite idée (1 écran, ≤ 2 US) → étape 2 · grosse feature (plusieurs écrans, schéma de données) → étape 1a ([détail 1a–1g](#instructions--chemin-spec-kit-étapes-1a-à-1g)) | — |
+| 1a | Rédiger la spec | 💬 | `/speckit-specify <description de l'idée en langage naturel>` | `specs/<NNN>-<slug>/spec.md` créé |
+| 1b | Lever les ambiguïtés (si besoin) | 💬 | `/speckit-clarify` | Au plus 5 questions, réponses intégrées à la spec |
+| 1c | ✋ **Relire la spec** | — | Ouvrir `specs/<NNN>-<slug>/spec.md` | Tu valides avant de continuer |
+| 1d | Plan technique | 💬 | `/speckit-plan` | `plan.md` conforme à la constitution |
+| 1e | Découper en tâches | 💬 | `/speckit-tasks` | `tasks.md` ordonné par dépendances |
+| 1f | Contrôle de cohérence | 💬 | `/speckit-analyze` | Rapport sans incohérence bloquante |
+| 1g | Créer les issues | 💬 | Recommandé : `/new-story US1 de specs/<NNN>-<slug>/spec.md` (une fois par US) · ou `/speckit-taskstoissues` (une issue par tâche, hors board) | Issues au format du pipeline → passer à l'étape 3 |
+| **2** | **Créer la User Story** (petite idée) | 💬 | `/new-story <ton besoin en une ou deux phrases>` | Issue `[US] …` avec critères Gherkin, labels, carte en Backlog |
+| **3** | **Relire l'US** | 🖥️ | `gh issue view <num>` | Critères observables, checklist INVEST cochée |
+| 3b | Vérifier qu'elle est prête | 🖥️ | `gh issue list --label "status: ready"` | L'issue apparaît (sinon : demander au PO de l'affiner) |
+| **4** | **Développer** | 💬 | `/pick-next <num>` | Branche `feat/<num>-slug`, PR ouverte avec `Closes #<num>`, label `status: review` |
+| 4b | Retrouver la PR | 🖥️ | `gh pr list --head feat/<num>-slug` | Numéro `<pr>` |
+| 4c | Tester toi-même (optionnel) | 🖥️ | `gh pr checkout <pr> && npm run dev` | Feature visible sur http://localhost:3000 |
+| **5** | **Code review** | 💬 | `/review-pr <pr>` | Review postée, dernière ligne `VERDICT: …` |
+| 5b | Si `CHANGES_REQUESTED` | 💬 | « Utilise le sous-agent developer pour corriger la PR #&lt;pr&gt; selon la review » puis `/review-pr <pr>` | Max **2 allers-retours**, ensuite c'est toi qui tranches |
+| **6** | **QA** (pas de slash command dédiée) | 💬 | « Utilise le sous-agent qa sur la PR #&lt;pr&gt; » | Tableau de preuves sur l'issue + `QA: GO` (ou `NO-GO` → retour étape 5b) |
+| 6b | Vérifier la CI | 🖥️ | `gh pr checks <pr>` | `test` et Vercel au vert |
+| 6c | Voir la preview Vercel | 🖥️ | `gh pr view <pr> --web` | Lien « Preview » dans les commentaires Vercel |
+| **7** | ✋ **Ta décision de merge** | — | Relire verdict + QA + CI | Tu donnes ton accord explicite |
+| 7b | Merger | 🖥️ | `gh pr merge <pr> --squash --delete-branch` | Commit `feat: … (#<pr>)` sur `main`, issue fermée, branche supprimée |
+| **8** | **Déplacer la carte en Deployed** | 🖥️ | `gh project item-list 1 --owner mehdisebei-debug --format json` puis `gh project item-edit --id <item-id> --project-id PVT_kwHOEgSBb84BfnM_ --field-id PVTSSF_lAHOEgSBb84BfnM_zhZ43jw --single-select-option-id 4cf0d3db` | Carte dans la colonne Deployed |
+| **9** | **Vérifier la production** | 🖥️ | `gh api repos/mehdisebei-debug/KIDS-APP/commits/main/status --jq .state` puis ouvrir l'URL Vercel | `success`, feature visible en prod |
+| 9b | Remettre le local à jour | 🖥️ | `git switch main && git pull` | Prêt pour l'idée suivante → retour étape 0 |
+
+> **Raccourci** : les étapes 4 à 6 peuvent s'enchaîner d'un coup avec 💬 `/run-sprint <num>`
+> (dev → review → QA, avec la limite de 2 boucles). Il **s'arrête toujours avant le merge** :
+> les étapes 7 à 9 restent les tiennes.
+>
+> **Raccourci idée → US** : `/new-story` suffit pour la plupart des idées ; Spec-Kit (1a–1g) sert quand
+> l'idée touche le schéma de données ou plusieurs écrans.
 
 ---
 
@@ -132,11 +176,11 @@ flowchart LR
     subgraph Vercel["▲ Vercel"]
         RSC[Server Components<br/>force-dynamic]
         MW[middleware.ts<br/>garde /admin/*]
-        ADM[/admin/events<br/>Server Actions/]
+        ADM["/admin/events<br/>Server Actions"]
     end
     subgraph Supabase["🟢 Supabase"]
         DB[(PostgreSQL + PostGIS<br/>RLS activée)]
-        RPC[[get_nearby_activities]]
+        RPC[[get_nearby_activities<br/>à venir]]
     end
     subgraph Ext["🌐 Sources externes"]
         OA[OpenAgenda API]
@@ -145,11 +189,13 @@ flowchart LR
     end
     UI --> RSC --> DB
     MAP --> MB
-    RSC --> RPC --> DB
+    RSC -.-> RPC -.-> DB
     MW --> ADM --> DB
     OA -- "scripts/import-openagenda.ts<br/>(service role)" --> DB
-    SOC -- "Projet Claude + connecteur<br/>→ activities_drafts" --> DB
+    SOC -. "Projet Claude + connecteur<br/>→ activities_drafts (à venir)" .-> DB
 ```
+
+> Traits pointillés = cible pas encore implémentée sur `main` (RPC géospatiale, ingestion réseaux).
 
 Règles d'architecture qui découlent de la constitution :
 
@@ -198,6 +244,7 @@ flowchart TD
     G1 -- non --> CL[speckit-clarify<br/>≤ 5 questions] --> S2
     G1 -- oui --> P[speckit-plan<br/>plan.md + design]
     P --> G2{Gate : plan OK ?}
+    G2 -- non --> P
     G2 -- oui --> T[speckit-tasks<br/>tasks.md]
     T --> AN[speckit-analyze<br/>cohérence spec/plan/tasks]
     AN --> TI[speckit-taskstoissues<br/>→ issues GitHub]
@@ -205,19 +252,120 @@ flowchart TD
     S1 --> R
 ```
 
-### Instructions — chemin Spec-Kit
+### Instructions — chemin Spec-Kit (étapes 1a à 1g)
 
-1. Décrire le besoin en langage naturel et lancer la skill `speckit-specify`.
-   → crée `specs/<NNN>-<slug>/spec.md` et met à jour `.specify/feature.json`.
-2. Relire la spec. Si des zones sont floues : `speckit-clarify`.
-3. `speckit-plan` → `plan.md` (choix techniques confrontés à la constitution).
-4. `speckit-tasks` → `tasks.md` ordonné par dépendances.
-5. `speckit-analyze` → rapport de cohérence (non destructif).
-6. `speckit-taskstoissues` → une issue par tâche/US, ensuite affinées par le `product-owner`.
-7. Plus tard, `speckit-converge` compare le code au plan et ajoute les tâches manquantes.
+Spec-Kit applique le *Spec-Driven Development* : on écrit **quoi** construire (spec), puis **comment**
+(plan), puis **dans quel ordre** (tâches), chaque document étant confronté à la constitution.
 
-> Exemple en cours : `specs/001-ingestion-sans-code/` (ingestion d'activités en brouillon depuis les
-> réseaux sociaux, validation humaine avant publication).
+| Étape | Commande | Lit | Produit | Modifie des fichiers ? |
+|---|---|---|---|---|
+| 1a | `/speckit-specify <idée>` | constitution | `specs/<NNN>-<slug>/spec.md`, `checklists/requirements.md`, `.specify/feature.json` | Oui |
+| 1b | `/speckit-clarify` | `spec.md` | Section *Clarifications* dans `spec.md` | Oui (spec) |
+| 1c | ✋ relecture humaine | `spec.md` | Ta validation | — |
+| 1d | `/speckit-plan` | `spec.md`, constitution | `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md` | Oui |
+| 1e | `/speckit-tasks` | `plan.md`, `spec.md`, design | `tasks.md` | Oui |
+| 1f | `/speckit-analyze` | spec + plan + tasks | Rapport de cohérence | **Non** (lecture seule) |
+| 1g | `/speckit-taskstoissues` | `tasks.md` | Issues GitHub | Oui (GitHub) |
+
+#### 1a — `/speckit-specify <ton idée>`
+
+**Toi :** décris l'idée en langage naturel, côté utilisateur, sans technique. Exemple :
+`/speckit-specify Les parents peuvent enregistrer le profil de leur enfant (date de naissance) pour que la liste soit filtrée automatiquement sur son âge`.
+
+**Claude :**
+- donne un nom court à la feature et crée `specs/<NNN>-<slug>/` (numérotation séquentielle : 002, 003…) ;
+- remplit `spec.md` : User Stories priorisées (P1, P2…) testables indépendamment, scénarios
+  *Given / When / Then*, exigences fonctionnelles, critères de succès mesurables, cas limites ;
+- génère `checklists/requirements.md` et s'auto-vérifie avec ;
+- pose au plus **3** marqueurs `[NEEDS CLARIFICATION]` sur les décisions critiques et te propose des options ;
+- enregistre la feature active dans `.specify/feature.json` (utilisée par les commandes suivantes).
+
+> Dans ce projet `here: true` (`.specify/init-options.json`) : **aucune branche Git n'est créée**,
+> les fichiers restent non versionnés jusqu'à ce que tu les commites avec la feature.
+
+#### 1b — `/speckit-clarify` (facultatif, conseillé)
+
+**Claude :** passe la spec au crible par catégorie (périmètre, données, parcours, erreurs,
+non-fonctionnel…), note chacune *Clear / Partial / Missing*, puis pose **au plus 5 questions**, une
+à la fois, avec une réponse recommandée.
+
+**Toi :** réponds. Chaque réponse est écrite directement dans `spec.md` (section *Clarifications*).
+
+À faire **avant** 1d ; ne se saute que pour un prototype jetable.
+
+#### 1c — ✋ Relecture humaine (porte de validation)
+
+Ouvre `spec.md` et vérifie :
+
+- [ ] ça décrit ce que tu veux, et rien de plus ;
+- [ ] les âges sont pensés pour être stockés **en mois** (principe II) ;
+- [ ] chaque critère est observable dans l'UI ;
+- [ ] plus aucun `[NEEDS CLARIFICATION]`.
+
+Sinon : corrige à la main ou relance 1a / 1b.
+
+#### 1d — `/speckit-plan`
+
+**Claude :** passe au *comment* :
+- `plan.md` : contexte technique, section **Constitution Check** (un écart non justifié = erreur
+  bloquante), structure des fichiers ;
+- `research.md` : résout les inconnues techniques et documente les choix ;
+- `data-model.md` : entités, champs, relations (ex. `birth_date`, jamais d'âge stocké) ;
+- `contracts/` : interfaces (requêtes Supabase, Server Actions…) ;
+- `quickstart.md` : scénarios de test manuels ;
+- refait le Constitution Check une fois le design terminé.
+
+**Toi :** vérifie l'absence de librairie non demandée, le respect de l'arborescence, `dynamic()` pour
+la carte, etc.
+
+#### 1e — `/speckit-tasks`
+
+**Claude :** génère `tasks.md`, une checklist ordonnée par dépendances :
+
+| Phase | Contenu |
+|---|---|
+| 1 | Setup |
+| 2 | Fondations bloquantes (ex. table SQL) |
+| 3+ | Une phase **par User Story**, par ordre de priorité |
+| Finale | Finitions transverses |
+
+Chaque tâche a un ID (`T001`…), un chemin de fichier précis, et `[P]` si elle est parallélisable.
+Stratégie « MVP d'abord » : la P1 seule doit déjà livrer de la valeur.
+
+#### 1f — `/speckit-analyze`
+
+**Claude :** audit **en lecture seule** de spec + plan + tasks. Il repère : exigences sans tâche (et
+inversement), doublons, ambiguïtés, terminologie incohérente, et **conflits avec la constitution**
+(toujours classés CRITICAL). Il rend un rapport par sévérité et propose un plan de correction, appliqué
+seulement avec ton accord.
+
+**Règle :** aucun CRITICAL restant avant 1g.
+
+#### 1g — `/speckit-taskstoissues`
+
+**Claude :** crée **une issue GitHub par tâche** de `tasks.md`, dans l'ordre des dépendances, en
+sautant celles qui existent déjà (dédoublonnage par ID `T001`…).
+
+> ⚠️ **Attention, ça ne s'emboîte pas tel quel avec le pipeline :**
+> 1. une issue **par tâche** (souvent 10 à 30), alors que le pipeline attend *une US = une issue* ;
+> 2. ces issues n'ont **pas** les labels `type: user-story` / `priority: *` / `status: ready` et ne sont
+>    **pas** sur le board : `/pick-next` ne les verra pas ;
+> 3. la skill passe par le **serveur MCP GitHub**, pas par `gh` : sans ce connecteur, elle échoue.
+>
+> **Recommandé :** à la place de 1g, lancer un `/new-story` **par User Story de la spec**, par exemple
+> `/new-story US1 de specs/002-profil-enfant/spec.md`. Le `product-owner` en fait une issue au bon
+> format (Gherkin, labels, board) → reprendre à l'étape 3 du [parcours complet](#11-parcours-complet-commande-par-commande).
+
+#### Et après la spec ?
+
+Spec-Kit fournit aussi `/speckit-implement` (coder les tâches) et `/speckit-converge` (comparer le code
+à la spec et **ajouter** en fin de `tasks.md` ce qui manque, sans réécrire le reste). Ici, c'est l'agent
+`developer` (`/pick-next`) qui code ; `/speckit-converge` reste utile en fin de feature pour vérifier
+que rien de la spec n'a été oublié.
+
+> Exemple en cours de rédaction (pas encore versionné) : la spec `001-ingestion-sans-code` (ingestion
+> d'activités en brouillon depuis les réseaux sociaux, validation humaine avant publication). Le dossier
+> `specs/` est destiné à être commité avec sa feature.
 
 ---
 
@@ -262,7 +410,7 @@ Alors un message « Aucune activité » avec un bouton « Réinitialiser » s'af
 | Label | Valeurs |
 |---|---|
 | Type | `type: user-story` (toujours) |
-| Zone | `area: age-filter` · `area: map` · `area: admin` |
+| Zone | `area: age-filter` · `area: map` · `area: admin` · `area: events` |
 | Priorité | `priority: p1` (bloquant MVP) · `priority: p2` |
 | Statut | `status: ready` → `in-progress` → `review` → `qa` |
 
@@ -290,18 +438,18 @@ sequenceDiagram
     participant GIT as Git local
     participant CI as GitHub Actions
     DEV->>GH: gh issue list --label "status: ready"
-    DEV->>GH: label status: in-progress + carte "In Progress"
-    DEV->>GIT: git switch main && git pull
-    DEV->>GIT: git switch -c feat/<num>-slug
+    DEV->>GH: label status in-progress + carte In Progress
+    DEV->>GIT: git switch main puis git pull
+    DEV->>GIT: git switch -c feat/NUM-slug
     loop Implémentation
         DEV->>GIT: Edit / Write
         Note over GIT: Hook PostToolUse → npm run type-check
     end
     DEV->>GIT: npm run lint && npm run type-check && npm run build
     DEV->>GIT: git commit (Conventional Commits FR)
-    DEV->>GH: git push + gh pr create (body : Closes #<num>)
+    DEV->>GH: git push + gh pr create (corps avec Closes NUM)
     GH->>CI: déclenche le job test
-    DEV->>GH: label status: review + carte "In Review"
+    DEV->>GH: label status review + carte In Review
 ```
 
 ### Instructions pas à pas
@@ -409,13 +557,13 @@ sequenceDiagram
     participant H as Humain
     participant GH as GitHub
     participant V as Vercel
-    QA->>H: QA: GO — puis-je merger la PR #N ?
+    QA->>H: QA GO, puis-je merger la PR N ?
     H-->>QA: Oui, merge.
     QA->>GH: gh pr merge N --squash
-    Note over GH: ruleset protect-main :<br/>PR obligatoire · check "test" vert · squash
+    Note over GH: ruleset protect-main<br/>PR obligatoire, check test vert, squash
     GH->>V: push sur main → build de production
-    GH-->>GH: Closes #N ferme l'issue
-    QA->>GH: carte → "Deployed"
+    GH-->>GH: Closes N ferme l'issue
+    QA->>GH: carte → Deployed
     QA->>V: vérifie la feature en production
 ```
 
@@ -443,8 +591,8 @@ La valeur de l'app dépend de la fraîcheur des données. Trois canaux d'aliment
 flowchart LR
     OA[OpenAgenda] -->|npm run import:openagenda| EV[(events)]
     ADM[Admin /admin/events<br/>CRUD protégé] --> EV
-    SOC[Lien / capture<br/>réseaux sociaux] -->|Projet Claude<br/>+ confirmation « ok »| DR[(activities_drafts<br/>RLS sans policy)]
-    DR -->|validation humaine| ACT[(activities<br/>lecture publique)]
+    SOC[Lien / capture<br/>réseaux sociaux] -.->|Projet Claude<br/>+ confirmation « ok »| DR[(activities_drafts<br/>à venir · RLS sans policy)]
+    DR -.->|validation humaine| ACT[(activities<br/>à venir · lecture publique)]
     EV --> APP[App parents]
     ACT --> APP
 ```
@@ -453,13 +601,21 @@ flowchart LR
 |---|---|---|
 | Import OpenAgenda | `npm run import:openagenda` | Service role côté script uniquement |
 | Admin CRUD | `/admin/events` | `middleware.ts` + cookie `admin_session` (`ADMIN_PASSWORD`) |
-| Ingestion réseaux (spec 001) | Projet Claude + connecteur Supabase | Brouillons invisibles aux parents ; publication après validation |
+| Ingestion réseaux (spec 001, **à venir**) | Projet Claude + connecteur Supabase | Brouillons invisibles aux parents ; publication après validation |
+
+> Les traits pointillés du schéma désignent ce qui n'est pas encore sur `main`.
 
 ### Schéma de base
 
-Les scripts SQL sont versionnés dans `scripts/sql/` et appliqués manuellement dans l'éditeur SQL
-Supabase (ou via `supabase db push` si la CLI est installée). Toute modification de schéma passe par
-une US + PR comme le reste du code.
+Les scripts SQL sont versionnés dans `scripts/sql/` et appliqués **manuellement** dans l'éditeur SQL
+Supabase. (`supabase db push` n'applique que le dossier `supabase/migrations/`, qui n'existe pas encore :
+voir section 17.) Toute modification de schéma passe par une US + PR comme le reste du code.
+
+| Table | État sur `main` | Script |
+|---|---|---|
+| `events` | ✅ existante | `scripts/sql/create-events-table.sql` |
+| `activities` | ⏳ à venir (PR #18, US #13) | `scripts/sql/create-activities-tables.sql` |
+| `activities_drafts` | ⏳ à venir (PR #18, US #13) | `scripts/sql/create-activities-tables.sql` |
 
 ### Suivi en production
 
@@ -476,15 +632,15 @@ Chaque handoff = **changement de label** `status: *` **ET** **déplacement de ca
 ```mermaid
 stateDiagram-v2
     [*] --> Backlog : /new-story
-    Backlog --> Ready : INVEST OK<br/>+ status: ready
-    Ready --> InProgress : developer prend la carte<br/>status: in-progress
-    InProgress --> InReview : PR ouverte<br/>status: review
-    InReview --> InProgress : VERDICT: CHANGES_REQUESTED
-    InReview --> QA : VERDICT: APPROVED<br/>status: qa
-    QA --> InProgress : QA: NO-GO
-    QA --> Deployed : QA: GO + accord humain<br/>merge squash
-    InReview --> Escalade : > 2 boucles
-    QA --> Escalade : > 2 boucles
+    Backlog --> Ready : INVEST OK, label ready
+    Ready --> InProgress : developer prend la carte
+    InProgress --> InReview : PR ouverte
+    InReview --> InProgress : CHANGES_REQUESTED
+    InReview --> QA : APPROVED
+    QA --> InProgress : NO-GO
+    QA --> Deployed : GO + accord humain + squash
+    InReview --> Escalade : plus de 2 boucles
+    QA --> Escalade : plus de 2 boucles
     Escalade --> InProgress : décision humaine
     Deployed --> [*]
 ```
@@ -524,10 +680,11 @@ gitGraph
     checkout main
     merge feat/7-fiche-detail-evenement id: "squash #10"
     branch feat/13-tables-ingestion
-    commit id: "chore: SQL"
-    checkout main
-    merge feat/13-tables-ingestion id: "squash (à venir)"
+    commit id: "chore: SQL (PR 18 ouverte)"
 ```
+
+> Mermaid dessine des commits de merge ; dans le dépôt, chaque merge est en réalité un **squash**
+> (un seul commit `feat: … (#N)` sur `main`). La branche `feat/13-tables-ingestion` n'est pas encore mergée.
 
 | Élément | Convention | Exemple |
 |---|---|---|
@@ -565,8 +722,9 @@ flowchart LR
 | 6 | QA | Agent | ✅ | Commentaire issue + PR |
 | 7 | Accord humain | — | ✅ | Chat / PR |
 
-> Le build CI ne nécessite aucun secret : les pages qui lisent Supabase sont en `force-dynamic` et
-> `createServerClient()` renvoie `null` si l'environnement manque.
+> Le build CI ne nécessite aucun secret : les pages qui lisent Supabase sont en `force-dynamic`, et
+> `createServerClient()` comme `createPublicServerClient()` (`lib/supabase/server.ts`) renvoient
+> `null` si l'environnement manque.
 
 ---
 
@@ -578,7 +736,7 @@ flowchart TD
     S -- "Bloquant<br/>(page blanche, fuite)" --> RB[Vercel : Instant Rollback<br/>vers le déploiement précédent]
     RB --> FIX
     S -- "Non bloquant" --> ISS[Issue fix + priority: p1]
-    ISS --> FIX[Branche fix/&lt;num&gt;-slug]
+    ISS --> FIX[Branche fix/NUM-slug]
     FIX --> PIPE[Pipeline normal :<br/>review → QA → accord → squash]
     PIPE --> V[Vérif prod]
 ```
@@ -644,10 +802,11 @@ gh project item-list 1 --owner mehdisebei-debug --format json
 | Variable | Portée |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Client + serveur |
+| `SUPABASE_URL` | Serveur, optionnelle — prioritaire sur la précédente pour `createServerClient()` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client + serveur |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Serveur / scripts uniquement** |
 | `NEXT_PUBLIC_MAPBOX_TOKEN` | Client |
-| `GOOGLE_PLACES_API_KEY` | Scripts d'import uniquement |
+| `GOOGLE_PLACES_API_KEY` | Scripts d'import uniquement (script Google Places pas encore écrit) |
 | `ADMIN_PASSWORD` | Serveur (middleware admin) — ⚠️ absente de `.env.local.example`, à y ajouter |
 
 Modèle : `.env.local.example`.
@@ -665,6 +824,10 @@ Modèle : `.env.local.example`.
 | State management | Zustand / TanStack Query pas encore installés | À installer avec accord humain quand les filtres seront branchés |
 | Auth parents | Supabase Auth non branché (seul l'admin a un mot de passe) | US « profil + favoris » |
 | Migrations | SQL versionné dans `scripts/sql/`, appliqué à la main | Passer à `supabase/migrations` + `supabase db push` |
+| RPC géospatiale | `get_nearby_activities` ni définie en SQL versionné ni appelée | À créer avec la feature « autour de moi » |
+| Tables `activities` / `activities_drafts` | Uniquement dans la PR #18 (US #13) | Disponibles après merge |
+| Import Google Places | `scripts/import-google-places.ts` cité dans `CLAUDE.md` mais absent | US dédiée |
+| Dossier `docs/` | Absent de l'arborescence de `CLAUDE.md` | L'y ajouter dans une PR `chore:` séparée |
 | Previews | Pas de vérification systématique des Preview Deployments Vercel | Ajouter l'URL de preview au rapport QA |
 | Mobile natif | Hors MVP | React Native + Expo après le MVP web |
 
