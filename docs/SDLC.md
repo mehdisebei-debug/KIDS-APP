@@ -44,7 +44,7 @@ flowchart LR
     A([💡 Idée / besoin]) --> B{Grosse feature ?}
     B -- oui --> C[Spec-Kit<br/>specify → plan → tasks]
     B -- non --> D["/new-story"]
-    C --> D2[Issues GitHub<br/>taskstoissues]
+    C --> D2["/new-story par US de la spec<br/>(ou taskstoissues)"]
     D --> E[📋 User Story<br/>Backlog → Ready]
     D2 --> E
     E --> F[👩‍💻 Développement<br/>branche + PR]
@@ -103,12 +103,14 @@ De l'idée que tu as en tête jusqu'à la feature en production. **Où** indique
 | **7** | ✋ **Ta décision de merge** | — | Relire verdict + QA + CI | Tu donnes ton accord explicite |
 | 7b | Merger | 🖥️ | `gh pr merge <pr> --squash --delete-branch` | Commit `feat: … (#<pr>)` sur `main`, issue fermée, branche supprimée |
 | **8** | **Déplacer la carte en Deployed** | 🖥️ | `gh project item-list 1 --owner mehdisebei-debug --format json` puis `gh project item-edit --id <item-id> --project-id PVT_kwHOEgSBb84BfnM_ --field-id PVTSSF_lAHOEgSBb84BfnM_zhZ43jw --single-select-option-id 4cf0d3db` | Carte dans la colonne Deployed |
-| **9** | **Vérifier la production** | 🖥️ | `gh api repos/mehdisebei-debug/KIDS-APP/commits/main/status --jq .state` puis ouvrir l'URL Vercel | `success`, feature visible en prod |
+| **9** | **Vérifier la production** | 🖥️ | `gh api repos/mehdisebei-debug/KIDS-APP/commits/main/status --jq .state` (statut Vercel) et `gh run list --branch main --limit 1` (job CI `test`), puis ouvrir l'URL Vercel | `success` + run `completed success`, feature visible en prod |
 | 9b | Remettre le local à jour | 🖥️ | `git switch main && git pull` | Prêt pour l'idée suivante → retour étape 0 |
 
 > **Raccourci** : les étapes 4 à 6 peuvent s'enchaîner d'un coup avec 💬 `/run-sprint <num>`
-> (dev → review → QA, avec la limite de 2 boucles). Il **s'arrête toujours avant le merge** :
-> les étapes 7 à 9 restent les tiennes.
+> (dev → review → QA, avec la limite de 2 boucles). Il **s'arrête toujours avant le merge** et attend
+> ta décision (étape 7, toujours humaine). Après ton accord explicite, `/run-sprint` exécute lui-même
+> les étapes 7b à 9 (merge squash, carte Deployed, vérification Vercel) ; sans `/run-sprint`, tu les
+> fais toi-même avec les commandes ci-dessus.
 >
 > **Raccourci idée → US** : `/new-story` suffit pour la plupart des idées ; Spec-Kit (1a–1g) sert quand
 > l'idée touche le schéma de données ou plusieurs écrans.
@@ -247,8 +249,10 @@ flowchart TD
     G2 -- non --> P
     G2 -- oui --> T[speckit-tasks<br/>tasks.md]
     T --> AN[speckit-analyze<br/>cohérence spec/plan/tasks]
-    AN --> TI[speckit-taskstoissues<br/>→ issues GitHub]
+    AN --> TI["/new-story par US de la spec<br/>(recommandé, voir 1g)"]
+    AN -.-> TI2[speckit-taskstoissues<br/>une issue par tâche, hors board]
     TI --> R[Phase 2 : affinage par le PO]
+    TI2 -.-> R
     S1 --> R
 ```
 
@@ -262,7 +266,7 @@ Spec-Kit applique le *Spec-Driven Development* : on écrit **quoi** construire (
 | 1a | `/speckit-specify <idée>` | constitution | `specs/<NNN>-<slug>/spec.md`, `checklists/requirements.md`, `.specify/feature.json` | Oui |
 | 1b | `/speckit-clarify` | `spec.md` | Section *Clarifications* dans `spec.md` | Oui (spec) |
 | 1c | ✋ relecture humaine | `spec.md` | Ta validation | — |
-| 1d | `/speckit-plan` | `spec.md`, constitution | `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md` | Oui |
+| 1d | `/speckit-plan` | `spec.md`, constitution | `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, et `contracts/` si interfaces externes | Oui |
 | 1e | `/speckit-tasks` | `plan.md`, `spec.md`, design | `tasks.md` | Oui |
 | 1f | `/speckit-analyze` | spec + plan + tasks | Rapport de cohérence | **Non** (lecture seule) |
 | 1g | `/speckit-taskstoissues` | `tasks.md` | Issues GitHub | Oui (GitHub) |
@@ -280,8 +284,11 @@ Spec-Kit applique le *Spec-Driven Development* : on écrit **quoi** construire (
 - pose au plus **3** marqueurs `[NEEDS CLARIFICATION]` sur les décisions critiques et te propose des options ;
 - enregistre la feature active dans `.specify/feature.json` (utilisée par les commandes suivantes).
 
-> Dans ce projet `here: true` (`.specify/init-options.json`) : **aucune branche Git n'est créée**,
-> les fichiers restent non versionnés jusqu'à ce que tu les commites avec la feature.
+> **Aucune branche Git n'est créée** dans ce projet : la création de branche est déléguée au hook
+> `before_specify` de l'extension git de Spec-Kit, déclaré dans `.specify/extensions.yml`, et ce
+> fichier n'existe pas ici. Les fichiers de spec restent donc non versionnés sur la branche courante
+> jusqu'à ce que tu les commites avec la feature. (`here: true` dans `.specify/init-options.json`
+> indique seulement que Spec-Kit a été initialisé dans le dossier courant.)
 
 #### 1b — `/speckit-clarify` (facultatif, conseillé)
 
@@ -311,7 +318,8 @@ Sinon : corrige à la main ou relance 1a / 1b.
   bloquante), structure des fichiers ;
 - `research.md` : résout les inconnues techniques et documente les choix ;
 - `data-model.md` : entités, champs, relations (ex. `birth_date`, jamais d'âge stocké) ;
-- `contracts/` : interfaces (requêtes Supabase, Server Actions…) ;
+- `contracts/` : interfaces (requêtes Supabase, Server Actions…), **seulement** si la feature expose
+  ou consomme des interfaces externes ;
 - `quickstart.md` : scénarios de test manuels ;
 - refait le Constitution Check une fois le design terminé.
 
