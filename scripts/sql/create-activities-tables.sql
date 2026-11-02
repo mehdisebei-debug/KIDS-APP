@@ -2,6 +2,8 @@
 -- dans Supabase SQL Editor (issue #13). Exécution manuelle, dans l'ordre du fichier :
 -- activities d'abord, puis activities_drafts (clé étrangère published_activity_id).
 -- Âges en mois (age_min / age_max), point PostGIS `location` généré par trigger.
+-- Ré-exécutable : le script peut être relancé sans erreur (IF NOT EXISTS,
+-- CREATE OR REPLACE, DROP TRIGGER/POLICY IF EXISTS avant chaque création).
 
 -- À exécuter dans le SQL Editor Supabase
 CREATE EXTENSION IF NOT EXISTS postgis;
@@ -13,11 +15,15 @@ RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.lat IS NOT NULL AND NEW.lng IS NOT NULL THEN
     NEW.location = ST_SetSRID(ST_MakePoint(NEW.lng, NEW.lat), 4326)::geography;
+  ELSE
+    -- lat ou lng absent : on efface le point pour ne pas garder une position obsolète
+    NEW.location = NULL;
   END IF;
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, extensions;
 
 -- =====================================================================
 -- 1. activities : activités PUBLIÉES (visibles par les parents)
@@ -30,7 +36,7 @@ CREATE TABLE IF NOT EXISTS activities (
   category         TEXT NOT NULL
                    CHECK (category IN ('PARC','SPECTACLE','ATELIER','AIRE_JEUX','RESTAURANT','EVENEMENT')),
   age_min          INTEGER NOT NULL CHECK (age_min >= 0),     -- en mois
-  age_max          INTEGER NOT NULL CHECK (age_max <= 216),   -- en mois
+  age_max          INTEGER NOT NULL CHECK (age_max >= 0 AND age_max <= 216),   -- en mois
   price_min        NUMERIC NOT NULL CHECK (price_min >= 0),   -- 0 = gratuit
   price_max        NUMERIC NOT NULL CHECK (price_max >= 0),
   address          TEXT NOT NULL,
@@ -60,6 +66,7 @@ CREATE INDEX IF NOT EXISTS activities_location_idx  ON activities USING GIST(loc
 CREATE INDEX IF NOT EXISTS activities_category_idx  ON activities(category);
 CREATE INDEX IF NOT EXISTS activities_name_trgm_idx ON activities USING GIN(name gin_trgm_ops);
 
+DROP TRIGGER IF EXISTS set_activity_location ON activities;
 CREATE TRIGGER set_activity_location
   BEFORE INSERT OR UPDATE ON activities
   FOR EACH ROW EXECUTE FUNCTION update_activity_location();
@@ -67,6 +74,7 @@ CREATE TRIGGER set_activity_location
 -- RLS : lecture publique, écriture via service_role uniquement (bypass RLS)
 ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Activities lisibles publiquement" ON activities;
 CREATE POLICY "Activities lisibles publiquement"
   ON activities FOR SELECT USING (true);
 
@@ -82,7 +90,7 @@ CREATE TABLE IF NOT EXISTS activities_drafts (
   description      TEXT,
   category         TEXT CHECK (category IN ('PARC','SPECTACLE','ATELIER','AIRE_JEUX','RESTAURANT','EVENEMENT')),
   age_min          INTEGER CHECK (age_min >= 0),              -- en mois
-  age_max          INTEGER CHECK (age_max <= 216),            -- en mois
+  age_max          INTEGER CHECK (age_max >= 0 AND age_max <= 216),            -- en mois
   price_min        NUMERIC CHECK (price_min >= 0),            -- NULL = inconnu, 0 = gratuit
   price_max        NUMERIC CHECK (price_max >= 0),
   address          TEXT,
@@ -118,6 +126,7 @@ CREATE INDEX IF NOT EXISTS activities_drafts_location_idx  ON activities_drafts 
 -- Doublons probables sans lien (captures) : similarité sur le nom
 CREATE INDEX IF NOT EXISTS activities_drafts_name_trgm_idx ON activities_drafts USING GIN(name gin_trgm_ops);
 
+DROP TRIGGER IF EXISTS set_draft_location ON activities_drafts;
 CREATE TRIGGER set_draft_location
   BEFORE INSERT OR UPDATE ON activities_drafts
   FOR EACH ROW EXECUTE FUNCTION update_activity_location();
@@ -142,6 +151,7 @@ ALTER TABLE activities_drafts ENABLE ROW LEVEL SECURITY;
 --   WHERE id = '<draft-id>' AND status = 'a_valider'
 --   RETURNING id
 -- )
--- UPDATE activities_drafts
--- SET status = 'publie', published_activity_id = (SELECT id FROM published)
--- WHERE id = '<draft-id>';
+-- UPDATE activities_drafts d
+-- SET status = 'publie', published_activity_id = p.id
+-- FROM published p
+-- WHERE d.id = '<draft-id>';
