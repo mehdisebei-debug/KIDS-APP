@@ -13,41 +13,64 @@ MVP ciblé sur l'Île-de-France, enfants de 0 à 6 ans.
 
 - **Frontend web :** Next.js 14 (App Router) + TypeScript + Tailwind CSS
 - **Mobile :** React Native + Expo (plus tard, pas dans le MVP web)
-- **Base de données :** Supabase (PostgreSQL + PostGIS + Auth + Storage)
+- **Base de données :** Supabase (PostgreSQL + PostGIS)
 - **Carte :** Mapbox GL JS via react-map-gl
-- **State :** Zustand (global) + React Query / TanStack Query (server state)
+- **State :** Zustand (global) + TanStack Query (server state) — **prévus, pas encore installés**
+  (ne pas les ajouter sans accord ; aujourd'hui : Server Components + `useState` dans les hooks)
 - **Déploiement :** Vercel (frontend) — branche main = production automatique
-- **Recherche :** pg_trgm (Supabase natif, pas d'Algolia)
-- **Auth :** Supabase Auth (email + Google OAuth)
+- **Recherche :** pg_trgm (Supabase natif, pas d'Algolia) — extension activée, utilisée pour les doublons
+- **Auth :**
+  - **Admin (en place)** : mot de passe `ADMIN_PASSWORD` + cookie de session signé (`lib/admin-session.ts`),
+    vérifié par `middleware.ts` sur `/admin/*` et revérifié dans chaque Server Action
+  - **Parents (prévu)** : Supabase Auth (email + Google OAuth), pas encore en place
+- **Spécifications :** GitHub Spec-Kit (`.specify/`, une spec par dossier dans `specs/`)
+
+> **État actuel (2026-11-24)** : les pages publiques lisent encore des données fictives
+> (`lib/data/mock-activities.ts`). Le branchement sur la table `activities` est l'issue #35.
 
 ---
 
 ## Structure des dossiers
 
+Arborescence réelle. Les éléments marqués *(prévu)* n'existent pas encore : les créer à cet
+emplacement le moment venu.
+
 ```
 kids-app/
 ├── app/                        # Next.js App Router
 │   ├── (public)/               # Routes publiques
-│   │   ├── page.tsx            # Accueil
-│   │   ├── liste/page.tsx      # Mode liste
-│   │   ├── carte/page.tsx      # Mode carte
-│   │   └── activite/[id]/      # Fiche détail
-│   ├── (auth)/                 # Routes protégées
-│   │   └── profil/             # Profil + favoris
+│   │   ├── page.tsx            # Accueil (événements à venir lus dans Supabase)
+│   │   ├── liste/page.tsx      # Mode liste (données mock, voir #35)
+│   │   ├── carte/page.tsx      # Mode carte (données mock, voir #35)
+│   │   ├── activite/[id]/      # Fiche détail activité (données mock, voir #35)
+│   │   └── evenement/[id]/     # Fiche détail événement (table events)
+│   ├── admin/                  # Espace admin protégé par middleware.ts
+│   │   ├── login/              # Connexion par mot de passe
+│   │   ├── events/             # CRUD événements + import OpenAgenda
+│   │   └── brouillons/         # (prévu, specs/003, #31 à #34) revue des brouillons
+│   ├── (auth)/profil/          # (prévu) profil parent + favoris
 │   ├── layout.tsx
 │   └── globals.css
 ├── components/
-│   ├── ui/                     # Composants génériques (shadcn)
-│   ├── activity/               # ActivityCard, ActivityList, ActivityMap
-│   ├── filters/                # FilterBar, AgeSlider, CategoryFilter
-│   └── layout/                 # Navbar, BottomNav, MobileDrawer
+│   ├── ui/                     # (prévu, specs/002, #21) composants génériques
+│   ├── activity/               # ActivityCard, ActivityList, ActivityMap, EventCard
+│   ├── filters/                # FilterBar
+│   └── layout/                 # Navbar, BottomNav
 ├── lib/
-│   ├── supabase/               # Client Supabase (browser + server)
-│   ├── types/                  # Types TypeScript partagés
-│   └── utils/                  # Helpers (distance, age, formatters)
-├── hooks/                      # useActivities, useGeolocation, useUser
-├── stores/                     # Zustand stores (filters, map state)
-└── scripts/                    # Import data (Google Places, OpenAgenda)
+│   ├── supabase/server.ts      # Clients serveur (service_role et anon) ; pas de client navigateur
+│   ├── admin-session.ts        # Signature / vérification du cookie admin
+│   ├── data/mock-activities.ts # Données fictives (à retirer avec #35)
+│   ├── types/                  # Types partagés (activity.ts, event.ts)
+│   └── utils/format.ts         # Formatters (âge, prix, lieu, dates)
+├── hooks/                      # useActivities (mock)
+├── middleware.ts               # Protection des routes /admin/*
+├── scripts/
+│   ├── import-openagenda.ts    # Import des événements OpenAgenda
+│   ├── utils/
+│   └── sql/                    # SQL versionné, exécuté à la main dans le SQL Editor Supabase
+├── specs/                      # Specs Spec-Kit (001 ingestion, 002 design KidMap, 003 revue admin)
+├── .specify/                   # Configuration Spec-Kit + constitution (memory/constitution.md)
+└── .claude/                    # Agents, skills et commandes du workflow multi-agents
 ```
 
 ---
@@ -78,6 +101,10 @@ interface Activity {
   source: string
   created_at: string
 }
+// ⚠️ La table `activities` a aussi city, postal_code, venue_name, date_start, date_end,
+// source_url, et plusieurs colonnes nullables : ce type est à aligner sur la table (#35).
+// Le brouillon d'ingestion (`activities_drafts`) est décrit dans
+// specs/003-admin-revue-brouillons/data-model.md.
 
 interface FilterState {
   category: Category | null
@@ -114,14 +141,16 @@ npm run build            # Build production
 npm run type-check       # TypeScript sans compilation
 npm run lint             # ESLint
 
-# Supabase (si CLI installée)
-supabase db push         # Applique les migrations
-supabase gen types       # Régénère les types TypeScript depuis le schéma
-
 # Import données
-npx tsx scripts/import-google-places.ts   # Import Google Places API
-npx tsx scripts/import-openagenda.ts      # Import événements OpenAgenda
+npm run import:openagenda                 # Import événements OpenAgenda (= npx tsx scripts/import-openagenda.ts)
 ```
+
+**Schéma de base :** pas de Supabase CLI ni de dossier de migrations. Le SQL est versionné dans
+`scripts/sql/` (ré-exécutable : `IF NOT EXISTS`, `CREATE OR REPLACE`, `DROP … IF EXISTS`) et
+exécuté **à la main** dans le SQL Editor Supabase par l'humain. Les types TypeScript sont écrits
+à la main dans `lib/types/`.
+
+*(Prévu, pas encore écrit : `scripts/import-google-places.ts`.)*
 
 ---
 
@@ -132,20 +161,30 @@ Toujours utiliser `.env.local` pour les secrets. Ne jamais hardcoder de clé API
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=       # Côté serveur uniquement
+SUPABASE_URL=                    # Optionnel, côté serveur (sinon NEXT_PUBLIC_SUPABASE_URL)
+SUPABASE_SERVICE_ROLE_KEY=       # Côté serveur uniquement (admin, scripts)
+ADMIN_PASSWORD=                  # Mot de passe de l'espace /admin
 NEXT_PUBLIC_MAPBOX_TOKEN=
-GOOGLE_PLACES_API_KEY=           # Scripts import seulement
+OPENAGENDA_API_KEY=              # Script d'import OpenAgenda
+GOOGLE_PLACES_API_KEY=           # (prévu) futur script Google Places
 ```
 
 ---
 
 ## Règles Supabase
 
-- Le client **browser** vient de `lib/supabase/client.ts`
-- Le client **serveur** (Server Components, Server Actions) vient de `lib/supabase/server.ts`
+- Clients serveur dans `lib/supabase/server.ts` (Server Components et Server Actions uniquement) :
+  - `createServerClient()` : clé `service_role`, contourne le RLS, **réservé à l'admin**
+  - `createPublicServerClient()` : clé anon, pour les pages publiques (lecture via RLS)
+- Pas encore de client **navigateur** : s'il en faut un, le créer dans `lib/supabase/client.ts`
+  (clé anon uniquement)
 - Ne jamais utiliser `SUPABASE_SERVICE_ROLE_KEY` côté client
-- Pour les requêtes géospatiales, utiliser la fonction RPC `get_nearby_activities(lat, lng, radius_km)`
-- Les Row Level Security (RLS) sont activées : lecture publique, écriture authentifiée
+- Tables : `activities` (publiées), `activities_drafts` (brouillons d'ingestion, jamais lisibles
+  par anon), `events` (OpenAgenda et saisie manuelle)
+- La fonction RPC `get_nearby_activities(lat, lng, radius_km)` est **prévue mais n'existe pas
+  encore** en base : la créer (SQL dans `scripts/sql/`) avant toute requête géospatiale
+- Les Row Level Security (RLS) sont activées : lecture publique, écriture via `service_role`
+  (admin, scripts, connecteur du Projet Claude d'ingestion)
 
 ---
 
